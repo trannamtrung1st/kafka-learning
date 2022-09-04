@@ -202,15 +202,6 @@ services:
     volumes:
       - ./misc/certs:/certs:ro
   
-  # ngrok:
-    # image: ngrok/ngrok:latest
-    # command: http https://host.docker.internal:9001 --log=stdout
-    # environment:
-    # - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN} 
-    # 1. Get free NGROK account: https://dashboard.ngrok.com/signup
-    # 2. Put NGROK_AUTHTOKEN=REAL_TOKEN_HERE in .env
-    # 3. Start the docker-compose
-  
   kafka:
     image: kafka-learning:kafka-linux-1.0
     build:
@@ -240,6 +231,15 @@ services:
         published: 1434
     mem_limit: 1.2g
     
+  # ngrok:
+    # image: ngrok/ngrok:latest
+    # command: http https://host.docker.internal:9001 --log=stdout
+    # environment:
+    # - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN} 
+    # 1. Get free NGROK account: https://dashboard.ngrok.com/signup
+    # 2. Put NGROK_AUTHTOKEN=REAL_TOKEN_HERE in .env
+    # 3. Start the docker-compose
+  
   # certbot:
     # image: certbot/certbot:latest
     # volumes:
