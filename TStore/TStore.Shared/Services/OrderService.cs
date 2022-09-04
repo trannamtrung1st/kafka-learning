@@ -1,5 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -204,7 +203,7 @@ namespace TStore.Shared.Services
             await _messagePublisher.PublishAsync(
                 EventConstants.Events.NewOrder,
                 orderModel.Id.ToString(),
-                JsonConvert.SerializeObject(orderModel));
+                orderModel);
 
             await _realtimeNotiService.NotifyAsync(new NotificationModel
             {
@@ -224,7 +223,7 @@ namespace TStore.Shared.Services
             await _messagePublisher.PublishAsync(
                 EventConstants.Events.PromotionApplied,
                 orderId.ToString(),
-                JsonConvert.SerializeObject(promotionAppliedEvent));
+                promotionAppliedEvent);
 
             await _realtimeNotiService.NotifyAsync(new NotificationModel
             {
@@ -244,7 +243,7 @@ namespace TStore.Shared.Services
             await _messagePublisher.PublishAsync(
                 EventConstants.Events.ShipApplied,
                 orderId.ToString(),
-                JsonConvert.SerializeObject(shipAppliedEvent));
+                shipAppliedEvent);
 
             await _realtimeNotiService.NotifyAsync(new NotificationModel
             {

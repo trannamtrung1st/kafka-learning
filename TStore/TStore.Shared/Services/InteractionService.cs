@@ -1,5 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -48,7 +47,7 @@ namespace TStore.Shared.Services
             await _commonMessagePublisher.PublishAsync(
                 EventConstants.Events.NewUnsavedInteraction,
                 Guid.NewGuid().ToString(),
-                JsonConvert.SerializeObject(interactionModel));
+                interactionModel);
         }
 
         public async Task SaveInteractionsAsync(List<InteractionModel> interactionModels)
@@ -87,7 +86,7 @@ FROM sys.columns A"
             await _commonMessagePublisher.PublishAsync(
                 EventConstants.Events.NewRecordedInteraction,
                 Guid.NewGuid().ToString(),
-                JsonConvert.SerializeObject(interactionModels));
+                interactionModels);
 
             await _realtimeNotiService.NotifyAsync(new NotificationModel
             {

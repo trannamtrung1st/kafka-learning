@@ -2,12 +2,12 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Newtonsoft.Json;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
 using TStore.Shared.Constants;
 using TStore.Shared.Models;
+using TStore.Shared.Serdes;
 using TStore.Shared.Services;
 
 namespace TStore.Consumers.PromotionCalculator
@@ -30,34 +30,44 @@ namespace TStore.Consumers.PromotionCalculator
         {
             Thread thread = new Thread(async () =>
             {
-                ConsumerConfig config = new ConsumerConfig
+                try
                 {
-                    BootstrapServers = _configuration.GetSection("KafkaServers").Value,
-                    GroupId = _configuration.GetSection("KafkaGroupId").Value,
-                    AutoOffsetReset = AutoOffsetReset.Earliest
-                };
-
-                using (IConsumer<string, string> consumer = new ConsumerBuilder<string, string>(config).Build())
-                {
-                    consumer.Subscribe(EventConstants.Events.NewOrder);
-
-                    bool cancelled = false;
-
-                    while (!cancelled)
+                    ConsumerConfig config = new ConsumerConfig
                     {
-                        ConsumeResult<string, string> message = consumer.Consume(default(CancellationToken));
+                        BootstrapServers = _configuration.GetSection("KafkaServers").Value,
+                        GroupId = _configuration.GetSection("KafkaGroupId").Value,
+                        AutoOffsetReset = AutoOffsetReset.Earliest
+                    };
 
-                        await _log.LogAsync($"Consumer {idx} begins handle message {message.Message.Timestamp.UtcDateTime}");
+                    using (IConsumer<string, OrderModel> consumer
+                        = new ConsumerBuilder<string, OrderModel>(config)
+                            .SetValueDeserializer(new SimpleJsonSerdes<OrderModel>())
+                            .Build())
+                    {
+                        consumer.Subscribe(EventConstants.Events.NewOrder);
 
-                        using (IServiceScope scope = _serviceProvider.CreateScope())
+                        bool cancelled = false;
+
+                        while (!cancelled)
                         {
-                            await HandleNewOrderAsync(
-                                Guid.Parse(message.Message.Key),
-                                JsonConvert.DeserializeObject<OrderModel>(message.Message.Value));
-                        }
-                    }
+                            ConsumeResult<string, OrderModel> message = consumer.Consume(default(CancellationToken));
 
-                    consumer.Close();
+                            await _log.LogAsync($"Consumer {idx} begins handle message {message.Message.Timestamp.UtcDateTime}");
+
+                            using (IServiceScope scope = _serviceProvider.CreateScope())
+                            {
+                                await HandleNewOrderAsync(
+                                    Guid.Parse(message.Message.Key),
+                                    message.Message.Value);
+                            }
+                        }
+
+                        consumer.Close();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine(ex);
                 }
             });
             thread.IsBackground = true;

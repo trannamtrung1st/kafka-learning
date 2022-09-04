@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
+using TStore.Shared.Serdes;
 
 namespace TStore.Shared.Services
 {
@@ -35,7 +36,16 @@ namespace TStore.Shared.Services
         {
             IProducer<TKey, TValue> producer = _producerMap.GetOrAdd(eventName, (key) =>
             {
-                return new ProducerBuilder<TKey, TValue>(_config).Build();
+                ProducerBuilder<TKey, TValue> builder = new ProducerBuilder<TKey, TValue>(_config);
+
+                Type valueType = typeof(TValue);
+
+                if (valueType.IsClass || valueType.IsInterface)
+                {
+                    builder.SetValueSerializer(new SimpleJsonSerdes<TValue>());
+                }
+
+                return builder.Build();
             }) as IProducer<TKey, TValue>;
 
             await producer.ProduceAsync(eventName, new Message<TKey, TValue>()

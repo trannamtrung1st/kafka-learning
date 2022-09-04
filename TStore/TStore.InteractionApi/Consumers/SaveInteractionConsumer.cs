@@ -1,7 +1,6 @@
 ﻿using Confluent.Kafka;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using TStore.Shared.Constants;
 using TStore.Shared.Models;
+using TStore.Shared.Serdes;
 using TStore.Shared.Services;
 
 namespace TStore.InteractionApi.Consumers
@@ -49,16 +49,19 @@ namespace TStore.InteractionApi.Consumers
 
             bool cancelled = false;
 
-            using (IConsumer<string, string> consumer = new ConsumerBuilder<string, string>(_config).Build())
+            using (IConsumer<string, InteractionModel> consumer
+                = new ConsumerBuilder<string, InteractionModel>(_config)
+                    .SetValueDeserializer(new SimpleJsonSerdes<InteractionModel>())
+                    .Build())
             {
                 consumer.Subscribe(EventConstants.Events.NewUnsavedInteraction);
 
-                List<ConsumeResult<string, string>> batch = new List<ConsumeResult<string, string>>();
+                List<ConsumeResult<string, InteractionModel>> batch = new List<ConsumeResult<string, InteractionModel>>();
                 bool isTimeout = false;
 
                 while (!cancelled)
                 {
-                    ConsumeResult<string, string> message = consumer.Consume(100);
+                    ConsumeResult<string, InteractionModel> message = consumer.Consume(100);
 
                     if (message != null)
                     {
@@ -78,13 +81,21 @@ namespace TStore.InteractionApi.Consumers
                         using (IServiceScope scope = _provider.CreateScope())
                         {
                             List<InteractionModel> interactions = batch
-                                .Select(m => JsonConvert.DeserializeObject<InteractionModel>(m.Message.Value))
+                                .Select(m => m.Message.Value)
                                 .ToList();
 
                             await HandleNewInteractionsAsync(scope.ServiceProvider, interactions);
                         }
 
-                        consumer.Commit();
+                        try
+                        {
+                            consumer.Commit();
+                        }
+                        catch (Exception ex)
+                        {
+                            await _log.LogAsync(ex.Message);
+                        }
+
                         batch.Clear();
                         isTimeout = false;
                     }
@@ -100,7 +111,17 @@ namespace TStore.InteractionApi.Consumers
 
             _id = id;
 
-            Thread thread = new Thread(async () => await ListenForNewInteractionAsync())
+            Thread thread = new Thread(async () =>
+            {
+                try
+                {
+                    await ListenForNewInteractionAsync();
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine(ex);
+                }
+            })
             {
                 IsBackground = true
             };

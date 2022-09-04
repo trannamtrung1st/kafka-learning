@@ -2,7 +2,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using TStore.Shared.Constants;
 using TStore.Shared.Models;
+using TStore.Shared.Serdes;
 using TStore.Shared.Services;
 
 namespace TStore.Consumers.InteractionAggregator
@@ -32,33 +32,42 @@ namespace TStore.Consumers.InteractionAggregator
         {
             Thread thread = new Thread(async () =>
             {
-                ConsumerConfig config = new ConsumerConfig
+                try
                 {
-                    BootstrapServers = _configuration.GetSection("KafkaServers").Value,
-                    GroupId = _configuration.GetSection("KafkaGroupId").Value,
-                    AutoOffsetReset = AutoOffsetReset.Earliest
-                };
-
-                bool cancelled = false;
-
-                using (IConsumer<string, string> consumer = new ConsumerBuilder<string, string>(config).Build())
-                {
-                    consumer.Subscribe(EventConstants.Events.NewRecordedInteraction);
-
-                    while (!cancelled)
+                    ConsumerConfig config = new ConsumerConfig
                     {
-                        ConsumeResult<string, string> message = consumer.Consume(default(CancellationToken));
+                        BootstrapServers = _configuration.GetSection("KafkaServers").Value,
+                        GroupId = _configuration.GetSection("KafkaGroupId").Value,
+                        AutoOffsetReset = AutoOffsetReset.Earliest
+                    };
 
-                        await _log.LogAsync($"Consumer {idx} begins handle message {message.Message.Timestamp.UtcDateTime}");
+                    bool cancelled = false;
 
-                        using (IServiceScope scope = _serviceProvider.CreateScope())
+                    using (IConsumer<string, IEnumerable<InteractionModel>> consumer
+                        = new ConsumerBuilder<string, IEnumerable<InteractionModel>>(config)
+                            .SetValueDeserializer(new SimpleJsonSerdes<IEnumerable<InteractionModel>>())
+                            .Build())
+                    {
+                        consumer.Subscribe(EventConstants.Events.NewRecordedInteraction);
+
+                        while (!cancelled)
                         {
-                            await HandleNewInteractionsAsync(
-                                JsonConvert.DeserializeObject<IEnumerable<InteractionModel>>(message.Message.Value));
-                        }
-                    }
+                            ConsumeResult<string, IEnumerable<InteractionModel>> message = consumer.Consume(default(CancellationToken));
 
-                    consumer.Close();
+                            await _log.LogAsync($"Consumer {idx} begins handle message {message.Message.Timestamp.UtcDateTime}");
+
+                            using (IServiceScope scope = _serviceProvider.CreateScope())
+                            {
+                                await HandleNewInteractionsAsync(message.Message.Value);
+                            }
+                        }
+
+                        consumer.Close();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine(ex);
                 }
             });
             thread.IsBackground = true;
