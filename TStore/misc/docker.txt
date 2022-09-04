@@ -1,0 +1,13 @@
+# Build Linux Kafka
+docker build . -f misc/Kafka/Dockerfile -t kafka-linux:1.0
+docker run --rm -it -p 9092:9092 kafka-linux:1.0
+docker run --rm -it -v %cd%/misc/Kafka/config:/kafka/config-override -p 9092:9092 kafka-linux:1.0
+
+# Build SqlServer 2019
+docker run -m 1.5g -v %cd%:/tools -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=z@123456!" -e "MSSQL_PID=Express" -p 1434:1433 -d mcr.microsoft.com/mssql/server:2019-latest
+
+# Build docker-compose
+docker-compose up -d
+docker-compose down
+#docker-compose up -f {path}
+docker-compose build [service] --no-cache --parallel

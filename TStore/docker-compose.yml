@@ -1,0 +1,217 @@
+version: "3.8"
+services:
+  client-app:
+    image: kafka-learning:ts-client-app-1.0
+    build:
+      context: .
+      dockerfile: t-store/Dockerfile
+    ports:
+      - target: 80
+        published: 4200
+      - target: 443
+        published: 4201
+    volumes:
+      - ./misc/client-app/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./misc/client-app/urls.json:/usr/share/nginx/html/assets/urls.json
+      - ./misc/client-app/dynamic-config.json:/usr/share/nginx/html/assets/dynamic-config.json
+  
+  realtime-api:
+    image: kafka-learning:ts-realtime-api-1.0
+    build:
+      context: .
+      dockerfile: TStore.RealtimeApi/Dockerfile
+    ports:
+      - target: 80
+        published: 8000
+      - target: 443
+        published: 8001
+    environment:
+      - ASPNETCORE_URLS=https://+:443;http://+:80
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=123456
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=/certs/ssl-cert.pfx
+    volumes:
+      - ./misc/certs:/certs:ro
+
+  sale-api:
+    image: kafka-learning:ts-sale-api-1.0
+    build:
+      context: .
+      dockerfile: TStore.SaleApi/Dockerfile
+    environment:
+      - ConnectionStrings__TStore=Server=host.docker.internal,1434;Database=KafkaTStore;Trusted_Connection=False;User Id=sa;Password=z@123456!
+      - RealtimeApiUrl=https://host.docker.internal:8001
+      - KafkaServers=kafka:29092
+      - ASPNETCORE_URLS=https://+:443;http://+:80
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=123456
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=/certs/ssl-cert.pfx
+    volumes:
+      - ./misc/certs:/certs:ro
+    depends_on:
+      - database
+      - kafka
+      - realtime-api
+    ports:
+      - target: 80
+        published: 5000
+      - target: 443
+        published: 5001
+  
+  interaction-api:
+    image: kafka-learning:ts-interaction-api-1.0
+    build:
+      context: .
+      dockerfile: TStore.InteractionApi/Dockerfile
+    environment:
+      - ConnectionStrings__TStoreInteraction=Server=host.docker.internal,1434;Database=KafkaTStoreInteraction;Trusted_Connection=False;User Id=sa;Password=z@123456!
+      - RealtimeApiUrl=https://host.docker.internal:8001
+      - KafkaServers=kafka:29092
+      - SaveByConsumers=false
+      - ASPNETCORE_URLS=https://+:443;http://+:80
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=123456
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=/certs/ssl-cert.pfx
+    volumes:
+      - ./misc/certs:/certs:ro
+    depends_on:
+      - database
+      - kafka
+      - realtime-api
+      - sale-api
+    ports:
+      - target: 80
+        published: 7000
+      - target: 443
+        published: 7001
+        
+  interaction-aggregator:
+    image: kafka-learning:ts-interaction-aggregator-1.0
+    build:
+      context: .
+      dockerfile: Consumers/TStore.Consumers.InteractionAggregator/Dockerfile
+    environment:
+      - ConnectionStrings__TStoreInteraction=Server=host.docker.internal,1434;Database=KafkaTStoreInteraction;Trusted_Connection=False;User Id=sa;Password=z@123456!
+      - RealtimeApiUrl=https://host.docker.internal:8001
+      - KafkaServers=kafka:29092
+    depends_on:
+      - database
+      - kafka
+      - realtime-api
+      - sale-api
+      
+  interaction-analysis:
+    image: kafka-learning:ts-interaction-analysis-1.0
+    build:
+      context: .
+      dockerfile: Consumers/TStore.Consumers.InteractionAnalysis/Dockerfile
+    environment:
+      - ConnectionStrings__TStoreInteraction=Server=host.docker.internal,1434;Database=KafkaTStoreInteraction;Trusted_Connection=False;User Id=sa;Password=z@123456!
+      - RealtimeApiUrl=https://host.docker.internal:8001
+      - KafkaServers=kafka:29092
+    depends_on:
+      - database
+      - kafka
+      - realtime-api
+      - sale-api
+      
+  interaction-bdl:
+    image: kafka-learning:ts-interaction-bdl-1.0
+    build:
+      context: .
+      dockerfile: Consumers/TStore.Consumers.InteractionBigDataLoader/Dockerfile
+    environment:
+      - ConnectionStrings__TStoreInteraction=Server=host.docker.internal,1434;Database=KafkaTStoreInteraction;Trusted_Connection=False;User Id=sa;Password=z@123456!
+      - RealtimeApiUrl=https://host.docker.internal:8001
+      - KafkaServers=kafka:29092
+    depends_on:
+      - database
+      - kafka
+      - realtime-api
+      - sale-api
+  
+  promotion-calculator:
+    image: kafka-learning:ts-promotion-calculator-1.0
+    build:
+      context: .
+      dockerfile: Consumers/TStore.Consumers.PromotionCalculator/Dockerfile
+    environment:
+      - ConnectionStrings__TStore=Server=host.docker.internal,1434;Database=KafkaTStore;Trusted_Connection=False;User Id=sa;Password=z@123456!
+      - RealtimeApiUrl=https://host.docker.internal:8001
+      - KafkaServers=kafka:29092
+    depends_on:
+      - database
+      - kafka
+      - realtime-api
+      - sale-api
+  
+  ship-calculator:
+    image: kafka-learning:ts-ship-calculator-1.0
+    build:
+      context: .
+      dockerfile: Consumers/TStore.Consumers.ShipCalculator/Dockerfile
+    environment:
+      - ConnectionStrings__TStore=Server=host.docker.internal,1434;Database=KafkaTStore;Trusted_Connection=False;User Id=sa;Password=z@123456!
+      - RealtimeApiUrl=https://host.docker.internal:8001
+      - KafkaServers=kafka:29092
+    depends_on:
+      - database
+      - kafka
+      - realtime-api
+      - sale-api
+  
+  reverse-proxy:
+    image: kafka-learning:ts-reverse-proxy-1.0
+    build:
+      context: .
+      dockerfile: TStore.WebReverseProxy/Dockerfile
+    ports:
+      - target: 80
+        published: 9000
+      - target: 443
+        published: 9001
+    environment:
+      - ASPNETCORE_URLS=https://+:443;http://+:80
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=123456
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=/certs/ssl-cert.pfx
+      - ReverseProxy__Clusters__ClientApp__Destinations__Main__Address=http://host.docker.internal:4200/
+      - ReverseProxy__Clusters__SaleApi__Destinations__Main__Address=https://host.docker.internal:5001/
+      - ReverseProxy__Clusters__InteractionApi__Destinations__Main__Address=https://host.docker.internal:7001/
+      - ReverseProxy__Clusters__RealtimeApi__Destinations__Main__Address=https://host.docker.internal:8001/
+    volumes:
+      - ./misc/certs:/certs:ro
+  
+  # ngrok:
+    # image: ngrok/ngrok:latest
+    # command: http https://host.docker.internal:9001 --log=stdout
+    # environment:
+    # - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN} 
+    # 1. Get free NGROK account: https://dashboard.ngrok.com/signup
+    # 2. Put NGROK_AUTHTOKEN=REAL_TOKEN_HERE in .env
+    # 3. Start the docker-compose
+  
+  kafka:
+    image: kafka-learning:kafka-linux-1.0
+    build:
+      context: .
+      dockerfile: misc/kafka/Dockerfile
+    volumes:
+      - ./misc/kafka/config:/kafka/config-override
+    ports:
+      - target: 9092
+        published: 9092
+  
+  database:
+    image: kafka-learning:ts-database-1.0
+    build:
+      context: .
+      dockerfile: misc/database/Dockerfile
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=z@123456!
+      - MSSQL_PID=Express
+    ports:
+      - target: 1433
+        published: 1434
+    mem_limit: 1.2g
+    
+networks:
+  default:
+    name: tstore-shared-network
