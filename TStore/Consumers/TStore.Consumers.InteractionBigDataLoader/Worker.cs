@@ -38,7 +38,9 @@ namespace TStore.Consumers.InteractionBigDataLoader
                     {
                         BootstrapServers = _configuration.GetSection("KafkaServers").Value,
                         GroupId = _configuration.GetSection("KafkaGroupId").Value,
-                        AutoOffsetReset = AutoOffsetReset.Latest
+                        AutoOffsetReset = AutoOffsetReset.Latest,
+                        SecurityProtocol = SecurityProtocol.Ssl,
+                        SslCaLocation = _configuration.GetSection("KafkaCaCert").Value
                     };
 
                     bool cancelled = false;

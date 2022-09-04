@@ -39,7 +39,9 @@ namespace TStore.InteractionApi.Consumers
                 BootstrapServers = configuration.GetSection("KafkaServers").Value,
                 GroupId = configuration.GetSection("KafkaGroupId").Value,
                 AutoOffsetReset = AutoOffsetReset.Earliest,
-                EnableAutoCommit = false // [Important]
+                EnableAutoCommit = false, // [Important]
+                SecurityProtocol = SecurityProtocol.Ssl,
+                SslCaLocation = configuration.GetSection("KafkaCaCert").Value
             };
         }
 

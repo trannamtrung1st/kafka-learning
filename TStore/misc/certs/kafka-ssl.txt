@@ -1,0 +1,20 @@
+# References: 
+# + https://github.com/mhowlett/confluent-kafka-dotnet/tree/security/examples/Security
+
+cd /kafka/certs/broker
+
+# Generate keystore
+keytool -keystore keystore.jks -alias localhost -validity 365 -genkey -keyalg RSA -storetype pkcs12
+
+# Generate CA cert
+openssl req -nodes -new -x509 -keyout ca-root.key -out ca-root.crt -days 365
+
+# Sign the broker public key certificate
+# 1. Generate Certificate Signing Request
+keytool -keystore keystore.jks -alias localhost -certreq -file localhost.csr
+# 2. Sign the cert
+openssl x509 -req -CA ca-root.crt -CAkey ca-root.key -in localhost.csr -out localhost.crt -days 365 -CAcreateserial 
+
+# Import signed certificate
+keytool -keystore keystore.jks -alias CARoot -import -noprompt -file ca-root.crt
+keytool -keystore keystore.jks -alias localhost -import -file localhost.crt

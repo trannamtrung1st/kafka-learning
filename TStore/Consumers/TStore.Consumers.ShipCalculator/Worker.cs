@@ -36,7 +36,9 @@ namespace TStore.Consumers.ShipCalculator
                     {
                         BootstrapServers = _configuration.GetSection("KafkaServers").Value,
                         GroupId = _configuration.GetSection("KafkaGroupId").Value,
-                        AutoOffsetReset = AutoOffsetReset.Earliest
+                        AutoOffsetReset = AutoOffsetReset.Earliest,
+                        SecurityProtocol = SecurityProtocol.Ssl,
+                        SslCaLocation = _configuration.GetSection("KafkaCaCert").Value
                     };
 
                     using (IConsumer<string, OrderModel> consumer

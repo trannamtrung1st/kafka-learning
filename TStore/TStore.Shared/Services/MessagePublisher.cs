@@ -22,11 +22,14 @@ namespace TStore.Shared.Services
         {
             string kafkaServers = configuration.GetSection("KafkaServers").Value;
             string kafkaClientId = configuration.GetSection("KafkaClientId").Value;
+            string caRootLocation = configuration.GetSection("KafkaCaCert").Value;
 
             _config = new ProducerConfig
             {
                 BootstrapServers = kafkaServers,
-                ClientId = kafkaClientId
+                ClientId = kafkaClientId,
+                SecurityProtocol = SecurityProtocol.Ssl,
+                SslCaLocation = caRootLocation, // or just install ca-root.crt
             };
 
             _producerMap = new ConcurrentDictionary<string, IClient>();

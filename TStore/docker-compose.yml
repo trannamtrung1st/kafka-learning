@@ -40,7 +40,9 @@ services:
     environment:
       - ConnectionStrings__TStore=Server=host.docker.internal,1434;Database=KafkaTStore;Trusted_Connection=False;User Id=sa;Password=z@123456!
       - RealtimeApiUrl=https://host.docker.internal:8001
-      - KafkaServers=kafka:29092
+      # - KafkaServers=kafka:29092
+      - KafkaServers=kafka:29093
+      - KafkaCaCert=/certs/kafka-broker/ca-root.crt
       - ASPNETCORE_URLS=https://+:443;http://+:80
       - ASPNETCORE_Kestrel__Certificates__Default__Password=123456
       - ASPNETCORE_Kestrel__Certificates__Default__Path=/certs/ssl-cert.pfx
@@ -64,7 +66,9 @@ services:
     environment:
       - ConnectionStrings__TStoreInteraction=Server=host.docker.internal,1434;Database=KafkaTStoreInteraction;Trusted_Connection=False;User Id=sa;Password=z@123456!
       - RealtimeApiUrl=https://host.docker.internal:8001
-      - KafkaServers=kafka:29092
+      # - KafkaServers=kafka:29092
+      - KafkaServers=kafka:29093
+      - KafkaCaCert=/certs/kafka-broker/ca-root.crt
       - SaveByConsumers=false
       - ASPNETCORE_URLS=https://+:443;http://+:80
       - ASPNETCORE_Kestrel__Certificates__Default__Password=123456
@@ -90,12 +94,16 @@ services:
     environment:
       - ConnectionStrings__TStoreInteraction=Server=host.docker.internal,1434;Database=KafkaTStoreInteraction;Trusted_Connection=False;User Id=sa;Password=z@123456!
       - RealtimeApiUrl=https://host.docker.internal:8001
-      - KafkaServers=kafka:29092
+      # - KafkaServers=kafka:29092
+      - KafkaServers=kafka:29093
+      - KafkaCaCert=/certs/kafka-broker/ca-root.crt
     depends_on:
       - database
       - kafka
       - realtime-api
       - sale-api
+    volumes:
+      - ./misc/certs/kafka-broker/ca-root.crt:/certs/kafka-broker/ca-root.crt
       
   interaction-analysis:
     image: kafka-learning:ts-interaction-analysis-1.0
@@ -105,12 +113,16 @@ services:
     environment:
       - ConnectionStrings__TStoreInteraction=Server=host.docker.internal,1434;Database=KafkaTStoreInteraction;Trusted_Connection=False;User Id=sa;Password=z@123456!
       - RealtimeApiUrl=https://host.docker.internal:8001
-      - KafkaServers=kafka:29092
+      # - KafkaServers=kafka:29092
+      - KafkaServers=kafka:29093
+      - KafkaCaCert=/certs/kafka-broker/ca-root.crt
     depends_on:
       - database
       - kafka
       - realtime-api
       - sale-api
+    volumes:
+      - ./misc/certs/kafka-broker/ca-root.crt:/certs/kafka-broker/ca-root.crt
       
   interaction-bdl:
     image: kafka-learning:ts-interaction-bdl-1.0
@@ -120,12 +132,16 @@ services:
     environment:
       - ConnectionStrings__TStoreInteraction=Server=host.docker.internal,1434;Database=KafkaTStoreInteraction;Trusted_Connection=False;User Id=sa;Password=z@123456!
       - RealtimeApiUrl=https://host.docker.internal:8001
-      - KafkaServers=kafka:29092
+      # - KafkaServers=kafka:29092
+      - KafkaServers=kafka:29093
+      - KafkaCaCert=/certs/kafka-broker/ca-root.crt
     depends_on:
       - database
       - kafka
       - realtime-api
       - sale-api
+    volumes:
+      - ./misc/certs/kafka-broker/ca-root.crt:/certs/kafka-broker/ca-root.crt
   
   promotion-calculator:
     image: kafka-learning:ts-promotion-calculator-1.0
@@ -135,12 +151,16 @@ services:
     environment:
       - ConnectionStrings__TStore=Server=host.docker.internal,1434;Database=KafkaTStore;Trusted_Connection=False;User Id=sa;Password=z@123456!
       - RealtimeApiUrl=https://host.docker.internal:8001
-      - KafkaServers=kafka:29092
+      # - KafkaServers=kafka:29092
+      - KafkaServers=kafka:29093
+      - KafkaCaCert=/certs/kafka-broker/ca-root.crt
     depends_on:
       - database
       - kafka
       - realtime-api
       - sale-api
+    volumes:
+      - ./misc/certs/kafka-broker/ca-root.crt:/certs/kafka-broker/ca-root.crt
   
   ship-calculator:
     image: kafka-learning:ts-ship-calculator-1.0
@@ -150,12 +170,16 @@ services:
     environment:
       - ConnectionStrings__TStore=Server=host.docker.internal,1434;Database=KafkaTStore;Trusted_Connection=False;User Id=sa;Password=z@123456!
       - RealtimeApiUrl=https://host.docker.internal:8001
-      - KafkaServers=kafka:29092
+      # - KafkaServers=kafka:29092
+      - KafkaServers=kafka:29093
+      - KafkaCaCert=/certs/kafka-broker/ca-root.crt
     depends_on:
       - database
       - kafka
       - realtime-api
       - sale-api
+    volumes:
+      - ./misc/certs/kafka-broker/ca-root.crt:/certs/kafka-broker/ca-root.crt
   
   reverse-proxy:
     image: kafka-learning:ts-reverse-proxy-1.0
@@ -194,9 +218,13 @@ services:
       dockerfile: misc/kafka/Dockerfile
     volumes:
       - ./misc/kafka/config:/kafka/config-override
+      - ./misc/certs/kafka-broker:/kafka/certs/broker
+      - ./misc/certs/kafka-client:/kafka/certs/client
     ports:
       - target: 9092
         published: 9092
+      - target: 9093
+        published: 9093
   
   database:
     image: kafka-learning:ts-database-1.0
@@ -211,6 +239,23 @@ services:
       - target: 1433
         published: 1434
     mem_limit: 1.2g
+    
+  # certbot:
+    # image: certbot/certbot:latest
+    # volumes:
+      # - ./misc/certs/kafka-broker:/certs/kafka-broker
+      # - ./misc/certs/kafka-client:/certs/kafka-client
+    # tty: true
+    
+  # openssl:
+    # image: kafka-learning:openssl-1.0
+    # build:
+      # context: .
+      # dockerfile: misc/openssl/Dockerfile
+    # volumes:
+      # - ./misc/certs/kafka-broker:/certs/kafka-broker
+      # - ./misc/certs/kafka-client:/certs/kafka-client
+    # tty: true
     
 networks:
   default:
