@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using TStore.Shared.Constants;
+using TStore.Shared.Helpers;
 using TStore.Shared.Services;
 
 namespace TStore.SaleApi.Services
@@ -28,6 +29,11 @@ namespace TStore.SaleApi.Services
 
             AdminClientConfig config = new AdminClientConfig();
             configuration.Bind("CommonAdminClientConfig", config);
+
+            if (configuration.GetValue<bool>("StartFromVS"))
+            {
+                config.FindCertIfNotFound();
+            }
 
             _adminClient = new AdminClientBuilder(config).Build();
         }

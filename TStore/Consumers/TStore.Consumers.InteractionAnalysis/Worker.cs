@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using TStore.Shared.Configs;
 using TStore.Shared.Constants;
+using TStore.Shared.Helpers;
 using TStore.Shared.Models;
 using TStore.Shared.Serdes;
 using TStore.Shared.Services;
@@ -30,6 +31,11 @@ namespace TStore.Consumers.InteractionAnalysis
             _log = log;
             _baseConfig = new AppConsumerConfig();
             _configuration.Bind("InteractionAnalysisConsumerConfig", _baseConfig);
+
+            if (_configuration.GetValue<bool>("StartFromVS"))
+            {
+                _baseConfig.FindCertIfNotFound();
+            }
         }
 
         private void StartConsumerThread(int idx)

@@ -40,10 +40,17 @@ services:
     environment:
       - ConnectionStrings__TStore=Server=host.docker.internal,1434;Database=KafkaTStore;Trusted_Connection=False;User Id=sa;Password=z@123456!
       - RealtimeApiUrl=https://host.docker.internal:8001
+      - StartFromVS=false
       - CommonProducerConfig__BootstrapServers=kafka:29093
       - CommonProducerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
+      - CommonProducerConfig__SslKeyPassword=123456
+      - CommonProducerConfig__SslCertificateLocation=/certs/kafka-client/tstore.crt
+      - CommonProducerConfig__SslKeyLocation=/certs/kafka-client/tstore.key
       - CommonAdminClientConfig__BootstrapServers=kafka:29093
       - CommonAdminClientConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
+      - CommonAdminClientConfig__SslKeyPassword=123456
+      - CommonAdminClientConfig__SslCertificateLocation=/certs/kafka-client/tstore.crt
+      - CommonAdminClientConfig__SslKeyLocation=/certs/kafka-client/tstore.key
       - ASPNETCORE_URLS=https://+:443;http://+:80
       - ASPNETCORE_Kestrel__Certificates__Default__Password=123456
       - ASPNETCORE_Kestrel__Certificates__Default__Path=/certs/ssl-cert.pfx
@@ -67,10 +74,17 @@ services:
     environment:
       - ConnectionStrings__TStoreInteraction=Server=host.docker.internal,1434;Database=KafkaTStoreInteraction;Trusted_Connection=False;User Id=sa;Password=z@123456!
       - RealtimeApiUrl=https://host.docker.internal:8001
+      - StartFromVS=false
       - SaveInteractionConsumerConfig__BootstrapServers=kafka:29093
       - SaveInteractionConsumerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
+      - SaveInteractionConsumerConfig__SslKeyPassword=123456
+      - SaveInteractionConsumerConfig__SslCertificateLocation=/certs/kafka-client/tstore.crt
+      - SaveInteractionConsumerConfig__SslKeyLocation=/certs/kafka-client/tstore.key
       - CommonProducerConfig__BootstrapServers=kafka:29093
       - CommonProducerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
+      - CommonProducerConfig__SslKeyPassword=123456
+      - CommonProducerConfig__SslCertificateLocation=/certs/kafka-client/tstore.crt
+      - CommonProducerConfig__SslKeyLocation=/certs/kafka-client/tstore.key
       - SaveByConsumers=false
       - ASPNETCORE_URLS=https://+:443;http://+:80
       - ASPNETCORE_Kestrel__Certificates__Default__Password=123456
@@ -96,8 +110,12 @@ services:
     environment:
       - ConnectionStrings__TStoreInteraction=Server=host.docker.internal,1434;Database=KafkaTStoreInteraction;Trusted_Connection=False;User Id=sa;Password=z@123456!
       - RealtimeApiUrl=https://host.docker.internal:8001
+      - StartFromVS=false
       - InteractionAggregatorConsumerConfig__BootstrapServers=kafka:29093
       - InteractionAggregatorConsumerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
+      - InteractionAggregatorConsumerConfig__SslKeyPassword=123456
+      - InteractionAggregatorConsumerConfig__SslCertificateLocation=/certs/kafka-client/tstore.crt
+      - InteractionAggregatorConsumerConfig__SslKeyLocation=/certs/kafka-client/tstore.key
     depends_on:
       - database
       - kafka
@@ -105,6 +123,7 @@ services:
       - sale-api
     volumes:
       - ./misc/certs/kafka-broker/ca-root.crt:/certs/kafka-broker/ca-root.crt
+      - ./misc/certs/kafka-client:/certs/kafka-client
       
   interaction-analysis:
     image: kafka-learning:ts-interaction-analysis-1.0
@@ -114,8 +133,12 @@ services:
     environment:
       - ConnectionStrings__TStoreInteraction=Server=host.docker.internal,1434;Database=KafkaTStoreInteraction;Trusted_Connection=False;User Id=sa;Password=z@123456!
       - RealtimeApiUrl=https://host.docker.internal:8001
+      - StartFromVS=false
       - InteractionAnalysisConsumerConfig__BootstrapServers=kafka:29093
       - InteractionAnalysisConsumerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
+      - InteractionAnalysisConsumerConfig__SslKeyPassword=123456
+      - InteractionAnalysisConsumerConfig__SslCertificateLocation=/certs/kafka-client/tstore.crt
+      - InteractionAnalysisConsumerConfig__SslKeyLocation=/certs/kafka-client/tstore.key
     depends_on:
       - database
       - kafka
@@ -123,6 +146,7 @@ services:
       - sale-api
     volumes:
       - ./misc/certs/kafka-broker/ca-root.crt:/certs/kafka-broker/ca-root.crt
+      - ./misc/certs/kafka-client:/certs/kafka-client
       
   interaction-bdl:
     image: kafka-learning:ts-interaction-bdl-1.0
@@ -132,8 +156,12 @@ services:
     environment:
       - ConnectionStrings__TStoreInteraction=Server=host.docker.internal,1434;Database=KafkaTStoreInteraction;Trusted_Connection=False;User Id=sa;Password=z@123456!
       - RealtimeApiUrl=https://host.docker.internal:8001
+      - StartFromVS=false
       - InteractionBigDataLoaderConsumerConfig__BootstrapServers=kafka:29093
       - InteractionBigDataLoaderConsumerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
+      - InteractionBigDataLoaderConsumerConfig__SslKeyPassword=123456
+      - InteractionBigDataLoaderConsumerConfig__SslCertificateLocation=/certs/kafka-client/tstore.crt
+      - InteractionBigDataLoaderConsumerConfig__SslKeyLocation=/certs/kafka-client/tstore.key
     depends_on:
       - database
       - kafka
@@ -141,6 +169,7 @@ services:
       - sale-api
     volumes:
       - ./misc/certs/kafka-broker/ca-root.crt:/certs/kafka-broker/ca-root.crt
+      - ./misc/certs/kafka-client:/certs/kafka-client
   
   promotion-calculator:
     image: kafka-learning:ts-promotion-calculator-1.0
@@ -150,10 +179,17 @@ services:
     environment:
       - ConnectionStrings__TStore=Server=host.docker.internal,1434;Database=KafkaTStore;Trusted_Connection=False;User Id=sa;Password=z@123456!
       - RealtimeApiUrl=https://host.docker.internal:8001
+      - StartFromVS=false
       - PromotionCalculatorConsumerConfig__BootstrapServers=kafka:29093
       - PromotionCalculatorConsumerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
+      - PromotionCalculatorConsumerConfig__SslKeyPassword=123456
+      - PromotionCalculatorConsumerConfig__SslCertificateLocation=/certs/kafka-client/tstore.crt
+      - PromotionCalculatorConsumerConfig__SslKeyLocation=/certs/kafka-client/tstore.key
       - CommonProducerConfig__BootstrapServers=kafka:29093
       - CommonProducerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
+      - CommonProducerConfig__SslKeyPassword=123456
+      - CommonProducerConfig__SslCertificateLocation=/certs/kafka-client/tstore.crt
+      - CommonProducerConfig__SslKeyLocation=/certs/kafka-client/tstore.key
     depends_on:
       - database
       - kafka
@@ -161,6 +197,7 @@ services:
       - sale-api
     volumes:
       - ./misc/certs/kafka-broker/ca-root.crt:/certs/kafka-broker/ca-root.crt
+      - ./misc/certs/kafka-client:/certs/kafka-client
   
   ship-calculator:
     image: kafka-learning:ts-ship-calculator-1.0
@@ -170,10 +207,17 @@ services:
     environment:
       - ConnectionStrings__TStore=Server=host.docker.internal,1434;Database=KafkaTStore;Trusted_Connection=False;User Id=sa;Password=z@123456!
       - RealtimeApiUrl=https://host.docker.internal:8001
+      - StartFromVS=false
       - ShipCalculatorConsumerConfig__BootstrapServers=kafka:29093
       - ShipCalculatorConsumerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
+      - ShipCalculatorConsumerConfig__SslKeyPassword=123456
+      - ShipCalculatorConsumerConfig__SslCertificateLocation=/certs/kafka-client/tstore.crt
+      - ShipCalculatorConsumerConfig__SslKeyLocation=/certs/kafka-client/tstore.key
       - CommonProducerConfig__BootstrapServers=kafka:29093
       - CommonProducerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
+      - CommonProducerConfig__SslKeyPassword=123456
+      - CommonProducerConfig__SslCertificateLocation=/certs/kafka-client/tstore.crt
+      - CommonProducerConfig__SslKeyLocation=/certs/kafka-client/tstore.key
     depends_on:
       - database
       - kafka
@@ -181,6 +225,7 @@ services:
       - sale-api
     volumes:
       - ./misc/certs/kafka-broker/ca-root.crt:/certs/kafka-broker/ca-root.crt
+      - ./misc/certs/kafka-client:/certs/kafka-client
   
   reverse-proxy:
     image: kafka-learning:ts-reverse-proxy-1.0

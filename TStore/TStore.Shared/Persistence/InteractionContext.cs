@@ -3,7 +3,6 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using TStore.Shared.Entities;
-using TStore.Shared.Helpers;
 
 namespace TStore.Shared.Persistence
 {
@@ -13,14 +12,12 @@ namespace TStore.Shared.Persistence
         {
             // [DEMO]
             Database.SetCommandTimeout(TimeSpan.FromSeconds(60));
-            MemoryHelper.CheckMemoryUsage();
         }
 
         public InteractionContext(DbContextOptions<InteractionContext> options) : base(options)
         {
             // [DEMO]
             Database.SetCommandTimeout(TimeSpan.FromSeconds(60));
-            MemoryHelper.CheckMemoryUsage();
         }
 
         public virtual DbSet<Interaction> Interactions { get; set; }

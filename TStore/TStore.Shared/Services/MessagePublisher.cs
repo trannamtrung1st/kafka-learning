@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
+using TStore.Shared.Helpers;
 using TStore.Shared.Serdes;
 
 namespace TStore.Shared.Services
@@ -22,6 +23,11 @@ namespace TStore.Shared.Services
         {
             _baseConfig = new ProducerConfig();
             configuration.Bind("CommonProducerConfig", _baseConfig);
+
+            if (configuration.GetValue<bool>("StartFromVS"))
+            {
+                _baseConfig.FindCertIfNotFound();
+            }
 
             _producerMap = new ConcurrentDictionary<string, IClient>();
         }
