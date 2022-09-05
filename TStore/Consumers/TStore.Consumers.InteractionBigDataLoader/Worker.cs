@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using TStore.Shared.Configs;
 using TStore.Shared.Constants;
 using TStore.Shared.Models;
 using TStore.Shared.Serdes;
@@ -19,6 +20,7 @@ namespace TStore.Consumers.InteractionBigDataLoader
         private readonly IConfiguration _configuration;
         private readonly IServiceProvider _serviceProvider;
         private readonly IApplicationLog _log;
+        private readonly AppConsumerConfig _baseConfig;
 
         public Worker(IServiceProvider serviceProvider, IConfiguration configuration,
             IApplicationLog log)
@@ -26,6 +28,8 @@ namespace TStore.Consumers.InteractionBigDataLoader
             _serviceProvider = serviceProvider;
             _configuration = configuration;
             _log = log;
+            _baseConfig = new AppConsumerConfig();
+            _configuration.Bind("InteractionBigDataLoaderConsumerConfig", _baseConfig);
         }
 
         private void StartConsumerThread(int idx)
@@ -34,19 +38,10 @@ namespace TStore.Consumers.InteractionBigDataLoader
             {
                 try
                 {
-                    ConsumerConfig config = new ConsumerConfig
-                    {
-                        BootstrapServers = _configuration.GetSection("KafkaServers").Value,
-                        GroupId = _configuration.GetSection("KafkaGroupId").Value,
-                        AutoOffsetReset = AutoOffsetReset.Latest,
-                        SecurityProtocol = SecurityProtocol.Ssl,
-                        SslCaLocation = _configuration.GetSection("KafkaCaCert").Value
-                    };
-
                     bool cancelled = false;
 
                     using (IConsumer<string, IEnumerable<InteractionModel>> consumer
-                        = new ConsumerBuilder<string, IEnumerable<InteractionModel>>(config)
+                        = new ConsumerBuilder<string, IEnumerable<InteractionModel>>(_baseConfig)
                             .SetValueDeserializer(new SimpleJsonSerdes<IEnumerable<InteractionModel>>())
                             .Build())
                     {
@@ -91,9 +86,7 @@ namespace TStore.Consumers.InteractionBigDataLoader
         {
             await _log.LogAsync("[INTERACTION BIG DATA LOADER]");
 
-            int consumerCount = _configuration.GetValue<int>("KafkaConsumerCount");
-
-            for (int i = 0; i < consumerCount; i++)
+            for (int i = 0; i < _baseConfig.ConsumerCount; i++)
             {
                 StartConsumerThread(i);
             }

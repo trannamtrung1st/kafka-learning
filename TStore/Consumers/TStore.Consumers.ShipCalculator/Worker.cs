@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using TStore.Shared.Configs;
 using TStore.Shared.Constants;
 using TStore.Shared.Models;
 using TStore.Shared.Serdes;
@@ -17,6 +18,7 @@ namespace TStore.Consumers.ShipCalculator
         private readonly IConfiguration _configuration;
         private readonly IServiceProvider _serviceProvider;
         private readonly IApplicationLog _log;
+        private readonly AppConsumerConfig _baseConfig;
 
         public Worker(IServiceProvider serviceProvider, IConfiguration configuration,
             IApplicationLog log)
@@ -24,6 +26,8 @@ namespace TStore.Consumers.ShipCalculator
             _serviceProvider = serviceProvider;
             _configuration = configuration;
             _log = log;
+            _baseConfig = new AppConsumerConfig();
+            _configuration.Bind("ShipCalculatorConsumerConfig", _baseConfig);
         }
 
         private void StartConsumerThread(int idx)
@@ -32,17 +36,8 @@ namespace TStore.Consumers.ShipCalculator
             {
                 try
                 {
-                    ConsumerConfig config = new ConsumerConfig
-                    {
-                        BootstrapServers = _configuration.GetSection("KafkaServers").Value,
-                        GroupId = _configuration.GetSection("KafkaGroupId").Value,
-                        AutoOffsetReset = AutoOffsetReset.Earliest,
-                        SecurityProtocol = SecurityProtocol.Ssl,
-                        SslCaLocation = _configuration.GetSection("KafkaCaCert").Value
-                    };
-
                     using (IConsumer<string, OrderModel> consumer
-                        = new ConsumerBuilder<string, OrderModel>(config)
+                        = new ConsumerBuilder<string, OrderModel>(_baseConfig)
                             .SetValueDeserializer(new SimpleJsonSerdes<OrderModel>())
                             .Build())
                     {
@@ -61,6 +56,15 @@ namespace TStore.Consumers.ShipCalculator
                                 await HandleNewOrderAsync(
                                     Guid.Parse(message.Message.Key),
                                     message.Message.Value);
+                            }
+
+                            try
+                            {
+                                consumer.Commit();
+                            }
+                            catch (Exception ex)
+                            {
+                                await _log.LogAsync(ex.Message);
                             }
                         }
 
@@ -89,9 +93,7 @@ namespace TStore.Consumers.ShipCalculator
         {
             await _log.LogAsync("[SHIP CALCULATOR]");
 
-            int consumerCount = _configuration.GetValue<int>("KafkaConsumerCount");
-
-            for (int i = 0; i < consumerCount; i++)
+            for (int i = 0; i < _baseConfig.ConsumerCount; i++)
             {
                 StartConsumerThread(i);
             }

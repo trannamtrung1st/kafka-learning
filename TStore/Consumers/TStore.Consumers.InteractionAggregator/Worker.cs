@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using TStore.Shared.Configs;
 using TStore.Shared.Constants;
 using TStore.Shared.Models;
 using TStore.Shared.Serdes;
@@ -19,6 +20,7 @@ namespace TStore.Consumers.InteractionAggregator
         private readonly IConfiguration _configuration;
         private readonly IServiceProvider _serviceProvider;
         private readonly IApplicationLog _log;
+        private readonly AppConsumerConfig _baseConfig;
 
         public Worker(IServiceProvider serviceProvider, IConfiguration configuration,
             IApplicationLog log)
@@ -26,6 +28,8 @@ namespace TStore.Consumers.InteractionAggregator
             _serviceProvider = serviceProvider;
             _configuration = configuration;
             _log = log;
+            _baseConfig = new AppConsumerConfig();
+            _configuration.Bind("InteractionAggregatorConsumerConfig", _baseConfig);
         }
 
         private void StartConsumerThread(int idx)
@@ -34,19 +38,10 @@ namespace TStore.Consumers.InteractionAggregator
             {
                 try
                 {
-                    ConsumerConfig config = new ConsumerConfig
-                    {
-                        BootstrapServers = _configuration.GetSection("KafkaServers").Value,
-                        GroupId = _configuration.GetSection("KafkaGroupId").Value,
-                        AutoOffsetReset = AutoOffsetReset.Earliest,
-                        SecurityProtocol = SecurityProtocol.Ssl,
-                        SslCaLocation = _configuration.GetSection("KafkaCaCert").Value
-                    };
-
                     bool cancelled = false;
 
                     using (IConsumer<string, IEnumerable<InteractionModel>> consumer
-                        = new ConsumerBuilder<string, IEnumerable<InteractionModel>>(config)
+                        = new ConsumerBuilder<string, IEnumerable<InteractionModel>>(_baseConfig)
                             .SetValueDeserializer(new SimpleJsonSerdes<IEnumerable<InteractionModel>>())
                             .Build())
                     {
@@ -61,6 +56,15 @@ namespace TStore.Consumers.InteractionAggregator
                             using (IServiceScope scope = _serviceProvider.CreateScope())
                             {
                                 await HandleNewInteractionsAsync(message.Message.Value);
+                            }
+
+                            try
+                            {
+                                consumer.Commit();
+                            }
+                            catch (Exception ex)
+                            {
+                                await _log.LogAsync(ex.Message);
                             }
                         }
 
@@ -89,9 +93,7 @@ namespace TStore.Consumers.InteractionAggregator
         {
             await _log.LogAsync("[INTERACTION AGGREGATOR]");
 
-            int consumerCount = _configuration.GetValue<int>("KafkaConsumerCount");
-
-            for (int i = 0; i < consumerCount; i++)
+            for (int i = 0; i < _baseConfig.ConsumerCount; i++)
             {
                 StartConsumerThread(i);
             }

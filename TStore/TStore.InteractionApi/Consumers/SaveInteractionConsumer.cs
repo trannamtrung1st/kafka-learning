@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using TStore.Shared.Configs;
 using TStore.Shared.Constants;
 using TStore.Shared.Models;
 using TStore.Shared.Serdes;
@@ -20,29 +21,20 @@ namespace TStore.InteractionApi.Consumers
 
     public class SaveInteractionConsumer : ISaveInteractionConsumer
     {
-        private readonly ConsumerConfig _config;
+        private readonly AppConsumerConfig _baseConfig;
         private readonly IServiceProvider _provider;
         private readonly IApplicationLog _log;
 
         private int? _id;
-        private readonly int _batchSize;
 
         public SaveInteractionConsumer(IConfiguration configuration,
             IServiceProvider provider,
             IApplicationLog log)
         {
-            _batchSize = configuration.GetValue<int>("KafkaBatchSize");
             _provider = provider;
             _log = log;
-            _config = new ConsumerConfig
-            {
-                BootstrapServers = configuration.GetSection("KafkaServers").Value,
-                GroupId = configuration.GetSection("KafkaGroupId").Value,
-                AutoOffsetReset = AutoOffsetReset.Earliest,
-                EnableAutoCommit = false, // [Important]
-                SecurityProtocol = SecurityProtocol.Ssl,
-                SslCaLocation = configuration.GetSection("KafkaCaCert").Value
-            };
+            _baseConfig = new AppConsumerConfig();
+            configuration.Bind("SaveInteractionConsumerConfig", _baseConfig);
         }
 
         public async Task ListenForNewInteractionAsync()
@@ -52,7 +44,7 @@ namespace TStore.InteractionApi.Consumers
             bool cancelled = false;
 
             using (IConsumer<string, InteractionModel> consumer
-                = new ConsumerBuilder<string, InteractionModel>(_config)
+                = new ConsumerBuilder<string, InteractionModel>(_baseConfig)
                     .SetValueDeserializer(new SimpleJsonSerdes<InteractionModel>())
                     .Build())
             {
@@ -76,7 +68,7 @@ namespace TStore.InteractionApi.Consumers
                         isTimeout = true;
                     }
 
-                    if (batch.Count > 0 && (batch.Count >= _batchSize || isTimeout))
+                    if (batch.Count > 0 && (batch.Count >= _baseConfig.BatchSize || isTimeout))
                     {
                         await _log.LogAsync($"Consumer {_id} begins processing batch of {batch.Count} messages");
 

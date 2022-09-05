@@ -25,17 +25,9 @@ namespace TStore.SaleApi.Services
             IApplicationLog log)
         {
             _log = log;
-            string kafkaServers = configuration.GetSection("KafkaServers").Value;
-            string kafkaClientId = configuration.GetSection("KafkaClientId").Value;
-            string caRootLocation = configuration.GetSection("KafkaCaCert").Value;
 
-            AdminClientConfig config = new AdminClientConfig
-            {
-                BootstrapServers = kafkaServers,
-                SecurityProtocol = SecurityProtocol.Ssl,
-                SslCaLocation = caRootLocation, // or just install ca-root.crt
-                ClientId = kafkaClientId
-            };
+            AdminClientConfig config = new AdminClientConfig();
+            configuration.Bind("CommonAdminClientConfig", config);
 
             _adminClient = new AdminClientBuilder(config).Build();
         }

@@ -40,9 +40,10 @@ services:
     environment:
       - ConnectionStrings__TStore=Server=host.docker.internal,1434;Database=KafkaTStore;Trusted_Connection=False;User Id=sa;Password=z@123456!
       - RealtimeApiUrl=https://host.docker.internal:8001
-      # - KafkaServers=kafka:29092
-      - KafkaServers=kafka:29093
-      - KafkaCaCert=/certs/kafka-broker/ca-root.crt
+      - CommonProducerConfig__BootstrapServers=kafka:29093
+      - CommonProducerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
+      - CommonAdminClientConfig__BootstrapServers=kafka:29093
+      - CommonAdminClientConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
       - ASPNETCORE_URLS=https://+:443;http://+:80
       - ASPNETCORE_Kestrel__Certificates__Default__Password=123456
       - ASPNETCORE_Kestrel__Certificates__Default__Path=/certs/ssl-cert.pfx
@@ -66,9 +67,10 @@ services:
     environment:
       - ConnectionStrings__TStoreInteraction=Server=host.docker.internal,1434;Database=KafkaTStoreInteraction;Trusted_Connection=False;User Id=sa;Password=z@123456!
       - RealtimeApiUrl=https://host.docker.internal:8001
-      # - KafkaServers=kafka:29092
-      - KafkaServers=kafka:29093
-      - KafkaCaCert=/certs/kafka-broker/ca-root.crt
+      - SaveInteractionConsumerConfig__BootstrapServers=kafka:29093
+      - SaveInteractionConsumerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
+      - CommonProducerConfig__BootstrapServers=kafka:29093
+      - CommonProducerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
       - SaveByConsumers=false
       - ASPNETCORE_URLS=https://+:443;http://+:80
       - ASPNETCORE_Kestrel__Certificates__Default__Password=123456
@@ -94,9 +96,8 @@ services:
     environment:
       - ConnectionStrings__TStoreInteraction=Server=host.docker.internal,1434;Database=KafkaTStoreInteraction;Trusted_Connection=False;User Id=sa;Password=z@123456!
       - RealtimeApiUrl=https://host.docker.internal:8001
-      # - KafkaServers=kafka:29092
-      - KafkaServers=kafka:29093
-      - KafkaCaCert=/certs/kafka-broker/ca-root.crt
+      - InteractionAggregatorConsumerConfig__BootstrapServers=kafka:29093
+      - InteractionAggregatorConsumerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
     depends_on:
       - database
       - kafka
@@ -113,9 +114,8 @@ services:
     environment:
       - ConnectionStrings__TStoreInteraction=Server=host.docker.internal,1434;Database=KafkaTStoreInteraction;Trusted_Connection=False;User Id=sa;Password=z@123456!
       - RealtimeApiUrl=https://host.docker.internal:8001
-      # - KafkaServers=kafka:29092
-      - KafkaServers=kafka:29093
-      - KafkaCaCert=/certs/kafka-broker/ca-root.crt
+      - InteractionAnalysisConsumerConfig__BootstrapServers=kafka:29093
+      - InteractionAnalysisConsumerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
     depends_on:
       - database
       - kafka
@@ -132,9 +132,8 @@ services:
     environment:
       - ConnectionStrings__TStoreInteraction=Server=host.docker.internal,1434;Database=KafkaTStoreInteraction;Trusted_Connection=False;User Id=sa;Password=z@123456!
       - RealtimeApiUrl=https://host.docker.internal:8001
-      # - KafkaServers=kafka:29092
-      - KafkaServers=kafka:29093
-      - KafkaCaCert=/certs/kafka-broker/ca-root.crt
+      - InteractionBigDataLoaderConsumerConfig__BootstrapServers=kafka:29093
+      - InteractionBigDataLoaderConsumerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
     depends_on:
       - database
       - kafka
@@ -151,9 +150,10 @@ services:
     environment:
       - ConnectionStrings__TStore=Server=host.docker.internal,1434;Database=KafkaTStore;Trusted_Connection=False;User Id=sa;Password=z@123456!
       - RealtimeApiUrl=https://host.docker.internal:8001
-      # - KafkaServers=kafka:29092
-      - KafkaServers=kafka:29093
-      - KafkaCaCert=/certs/kafka-broker/ca-root.crt
+      - PromotionCalculatorConsumerConfig__BootstrapServers=kafka:29093
+      - PromotionCalculatorConsumerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
+      - CommonProducerConfig__BootstrapServers=kafka:29093
+      - CommonProducerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
     depends_on:
       - database
       - kafka
@@ -170,9 +170,10 @@ services:
     environment:
       - ConnectionStrings__TStore=Server=host.docker.internal,1434;Database=KafkaTStore;Trusted_Connection=False;User Id=sa;Password=z@123456!
       - RealtimeApiUrl=https://host.docker.internal:8001
-      # - KafkaServers=kafka:29092
-      - KafkaServers=kafka:29093
-      - KafkaCaCert=/certs/kafka-broker/ca-root.crt
+      - ShipCalculatorConsumerConfig__BootstrapServers=kafka:29093
+      - ShipCalculatorConsumerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
+      - CommonProducerConfig__BootstrapServers=kafka:29093
+      - CommonProducerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
     depends_on:
       - database
       - kafka

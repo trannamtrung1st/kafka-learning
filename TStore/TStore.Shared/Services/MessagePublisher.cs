@@ -16,21 +16,12 @@ namespace TStore.Shared.Services
     {
         private readonly ConcurrentDictionary<string, IClient> _producerMap;
         private bool _disposedValue;
-        private readonly ProducerConfig _config;
+        private readonly ProducerConfig _baseConfig;
 
         public KafkaCommonMessagePublisher(IConfiguration configuration)
         {
-            string kafkaServers = configuration.GetSection("KafkaServers").Value;
-            string kafkaClientId = configuration.GetSection("KafkaClientId").Value;
-            string caRootLocation = configuration.GetSection("KafkaCaCert").Value;
-
-            _config = new ProducerConfig
-            {
-                BootstrapServers = kafkaServers,
-                ClientId = kafkaClientId,
-                SecurityProtocol = SecurityProtocol.Ssl,
-                SslCaLocation = caRootLocation, // or just install ca-root.crt
-            };
+            _baseConfig = new ProducerConfig();
+            configuration.Bind("CommonProducerConfig", _baseConfig);
 
             _producerMap = new ConcurrentDictionary<string, IClient>();
         }
@@ -39,7 +30,7 @@ namespace TStore.Shared.Services
         {
             IProducer<TKey, TValue> producer = _producerMap.GetOrAdd(eventName, (key) =>
             {
-                ProducerBuilder<TKey, TValue> builder = new ProducerBuilder<TKey, TValue>(_config);
+                ProducerBuilder<TKey, TValue> builder = new ProducerBuilder<TKey, TValue>(_baseConfig);
 
                 Type valueType = typeof(TValue);
 
