@@ -14,6 +14,7 @@ namespace TStore.SaleApi.Services
     public interface IMessageBrokerService
     {
         Task InitializeTopicsAsync();
+        Task InitializeAclsAsync();
     }
 
     public class KafkaMessageBrokerService : IMessageBrokerService, IDisposable
@@ -91,6 +92,88 @@ namespace TStore.SaleApi.Services
             }
         }
 
+        public async Task InitializeAclsAsync()
+        {
+            Metadata metadata = _adminClient.GetMetadata(TimeSpan.FromSeconds(10));
+
+            DescribeAclsResult describeResult = await _adminClient.DescribeAclsAsync(new AclBindingFilter()
+            {
+                PatternFilter = new ResourcePatternFilter
+                {
+                    ResourcePatternType = ResourcePatternType.Any,
+                    Type = ResourceType.Any,
+                },
+                EntryFilter = new AccessControlEntryFilter
+                {
+                    Operation = AclOperation.Any,
+                    PermissionType = AclPermissionType.Any,
+                }
+            });
+
+            AccessControlEntry allowConsumerRead = new AccessControlEntry
+            {
+                Host = "*",
+                Operation = AclOperation.Read,
+                PermissionType = AclPermissionType.Allow,
+                Principal = "User:consumer"
+            };
+
+            List<AclBinding> aclBindings = new List<AclBinding>()
+            {
+                new AclBinding
+                {
+                    Entry = new AccessControlEntry
+                    {
+                        Host = "*",
+                        Operation = AclOperation.Write,
+                        PermissionType = AclPermissionType.Allow,
+                        Principal = "User:producer"
+                    },
+                    Pattern = new ResourcePattern
+                    {
+                        Name = "*",
+                        Type = ResourceType.Topic,
+                        ResourcePatternType = ResourcePatternType.Literal
+                    }
+                },
+                new AclBinding
+                {
+                    Entry = allowConsumerRead,
+                    Pattern = new ResourcePattern
+                    {
+                        Name = "*",
+                        Type = ResourceType.Topic,
+                        ResourcePatternType = ResourcePatternType.Literal
+                    }
+                },
+                new AclBinding
+                {
+                    Entry = allowConsumerRead,
+                    Pattern = new ResourcePattern
+                    {
+                        Name = "*",
+                        Type = ResourceType.Group,
+                        ResourcePatternType = ResourcePatternType.Literal
+                    }
+                }
+            };
+
+            aclBindings = aclBindings
+                .Where(srcBinding => !describeResult.AclBindings.Any(destBinding => AclEquals(srcBinding, destBinding)))
+                .ToList();
+
+            if (aclBindings.Count > 0)
+            {
+                Console.WriteLine("Creating ACLs:");
+                foreach (AclBinding aclBinding in aclBindings)
+                {
+                    Console.WriteLine(aclBinding);
+                }
+
+                await _adminClient.CreateAclsAsync(aclBindings);
+            }
+        }
+
         protected virtual void Dispose(bool disposing)
         {
             if (!_disposedValue)
@@ -119,6 +202,17 @@ namespace TStore.SaleApi.Services
             // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
             Dispose(disposing: true);
             GC.SuppressFinalize(this);
+        }
+
+        private bool AclEquals(AclBinding src, AclBinding dest)
+        {
+            return src.Entry?.Principal == dest.Entry?.Principal
+                && src.Entry?.PermissionType == dest.Entry?.PermissionType
+                && src.Entry?.Operation == dest.Entry?.Operation
+                && src.Entry?.Host == dest.Entry?.Host
+                && src.Pattern?.ResourcePatternType == dest.Pattern?.ResourcePatternType
+                && src.Pattern?.Type == dest.Pattern?.Type
+                && src.Pattern?.Name == dest.Pattern?.Name;
         }
     }
 }

@@ -43,7 +43,10 @@ namespace TStore.SaleApi
         private static async Task SetupMessageBrokerAsync(IServiceProvider provider)
         {
             IMessageBrokerService messageBrokerService = provider.GetService<IMessageBrokerService>();
+
             await messageBrokerService.InitializeTopicsAsync();
+
+            await messageBrokerService.InitializeAclsAsync();
         }
     }
 }
