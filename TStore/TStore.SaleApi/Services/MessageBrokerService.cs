@@ -65,6 +65,15 @@ namespace TStore.SaleApi.Services
                 });
             }
 
+            if (!topicNames.Contains(EventConstants.Events.ShipApplied))
+            {
+                topicSpecs.Add(new TopicSpecification
+                {
+                    Name = EventConstants.Events.ShipApplied,
+                    NumPartitions = 7
+                });
+            }
+
             if (!topicNames.Contains(EventConstants.Events.NewUnsavedInteraction))
             {
                 topicSpecs.Add(new TopicSpecification
