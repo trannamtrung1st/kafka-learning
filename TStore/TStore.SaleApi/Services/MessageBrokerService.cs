@@ -86,7 +86,8 @@ namespace TStore.SaleApi.Services
             {
                 await _adminClient.CreateTopicsAsync(topicSpecs);
 
-                await _log.LogAsync($"Finish creating topics: {string.Join(", ", topicNames)}");
+                await _log.LogAsync($"Finish creating topics: " +
+                    $"{string.Join(", ", topicSpecs.Select(spec => spec.Name))}");
             }
         }
 

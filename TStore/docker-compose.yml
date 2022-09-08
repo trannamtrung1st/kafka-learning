@@ -253,6 +253,8 @@ services:
     build:
       context: .
       dockerfile: misc/kafka/Dockerfile
+    environment:
+      - KAFKA_OPTS=${KAFKA_OPTS:--Djava.security.auth.login.config=/kafka/config-override/kafka_server_jaas.conf} # Setup SASL using Jaas static file
     volumes:
       - ./misc/kafka/config:/kafka/config-override
       - ./misc/certs/kafka-broker:/kafka/certs/broker
