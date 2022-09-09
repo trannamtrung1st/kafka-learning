@@ -10,7 +10,8 @@ namespace TStore.Shared.Services
 {
     public interface ICommonMessagePublisher
     {
-        Task PublishAsync<TKey, TValue>(string eventName, TKey key, TValue value);
+        Task PublishAsync<TKey, TValue>(string eventName, TKey key, TValue value, Action<object> deliveryHandler = null);
+        Task<object> PublishAndWaitAsync<TKey, TValue>(string eventName, TKey key, TValue value);
     }
 
     public class KafkaCommonMessagePublisher : ICommonMessagePublisher, IDisposable
@@ -32,7 +33,36 @@ namespace TStore.Shared.Services
             _producerMap = new ConcurrentDictionary<string, IClient>();
         }
 
-        public async Task PublishAsync<TKey, TValue>(string eventName, TKey key, TValue value)
+        public Task PublishAsync<TKey, TValue>(string eventName, TKey key, TValue value, Action<object> deliveryHandler = null)
+        {
+            IProducer<TKey, TValue> producer = GetProducer<TKey, TValue>(eventName);
+
+            // [DEMO] async call, provide delivery result callback
+            producer.Produce(eventName, new Message<TKey, TValue>()
+            {
+                Key = key,
+                Value = value,
+                Timestamp = new Timestamp(DateTimeOffset.UtcNow),
+            }, deliveryHandler);
+
+            return Task.CompletedTask;
+        }
+
+        public async Task<object> PublishAndWaitAsync<TKey, TValue>(string eventName, TKey key, TValue value)
+        {
+            IProducer<TKey, TValue> producer = GetProducer<TKey, TValue>(eventName);
+
+            DeliveryResult<TKey, TValue> result = await producer.ProduceAsync(eventName, new Message<TKey, TValue>()
+            {
+                Key = key,
+                Value = value,
+                Timestamp = new Timestamp(DateTimeOffset.UtcNow),
+            });
+
+            return result;
+        }
+
+        public IProducer<TKey, TValue> GetProducer<TKey, TValue>(string eventName)
         {
             IProducer<TKey, TValue> producer = _producerMap.GetOrAdd(eventName, (key) =>
             {
@@ -48,12 +78,7 @@ namespace TStore.Shared.Services
                 return builder.Build();
             }) as IProducer<TKey, TValue>;
 
-            await producer.ProduceAsync(eventName, new Message<TKey, TValue>()
-            {
-                Key = key,
-                Value = value,
-                Timestamp = new Timestamp(DateTimeOffset.UtcNow),
-            });
+            return producer;
         }
 
         protected virtual void Dispose(bool disposing)

@@ -58,7 +58,7 @@ namespace TStore.InteractionApi
                 return;
             }
 
-            int numberOfConsumers = configuration.GetValue<int>("NumberOfConsumers");
+            int numberOfConsumers = configuration.GetSection("SaveInteractionConsumerConfig").GetValue<int>("ConsumerCount");
             for (int i = 0; i < numberOfConsumers; i++)
             {
                 ISaveInteractionConsumer saveInteractionConsumer = rootProvider.GetRequiredService<ISaveInteractionConsumer>();

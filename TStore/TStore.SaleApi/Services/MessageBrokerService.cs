@@ -88,7 +88,11 @@ namespace TStore.SaleApi.Services
                 topicSpecs.Add(new TopicSpecification
                 {
                     Name = EventConstants.Events.NewRecordedInteraction,
-                    NumPartitions = 7
+                    NumPartitions = 7,
+                    Configs = new Dictionary<string, string>
+                    {
+                        ["max.message.bytes"] = "1048588" // allow batch up to 1MB
+                    }
                 });
             }
 

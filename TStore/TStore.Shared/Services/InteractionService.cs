@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Confluent.Kafka;
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -30,16 +31,19 @@ namespace TStore.Shared.Services
         private readonly IInteractionReportRepository _interactionReportRepository;
         private readonly ICommonMessagePublisher _commonMessagePublisher;
         private readonly IRealtimeNotiService _realtimeNotiService;
+        private readonly IApplicationLog _log;
 
         public InteractionService(IInteractionRepository interactionRepository,
             IInteractionReportRepository interactionReportRepository,
             ICommonMessagePublisher commonMessagePublisher,
-            IRealtimeNotiService realtimeNotiService)
+            IRealtimeNotiService realtimeNotiService,
+            IApplicationLog log)
         {
             _interactionRepository = interactionRepository;
             _interactionReportRepository = interactionReportRepository;
             _commonMessagePublisher = commonMessagePublisher;
             _realtimeNotiService = realtimeNotiService;
+            _log = log;
         }
 
         public async Task PublishNewUnsavedInteractionAsync(InteractionModel interactionModel)
@@ -47,7 +51,15 @@ namespace TStore.Shared.Services
             await _commonMessagePublisher.PublishAsync(
                 EventConstants.Events.NewUnsavedInteraction,
                 Guid.NewGuid().ToString(),
-                interactionModel);
+                interactionModel, async result =>
+                {
+                    DeliveryReport<string, InteractionModel> deliveryReport = result as DeliveryReport<string, InteractionModel>;
+
+                    if (deliveryReport?.Error?.IsError == true)
+                    {
+                        await _log.LogAsync($"Produce error: {deliveryReport.Error.Reason}");
+                    }
+                });
         }
 
         public async Task SaveInteractionsAsync(List<InteractionModel> interactionModels)
@@ -86,7 +98,15 @@ FROM sys.columns A"
             await _commonMessagePublisher.PublishAsync(
                 EventConstants.Events.NewRecordedInteraction,
                 Guid.NewGuid().ToString(),
-                interactionModels);
+                interactionModels, async result =>
+                {
+                    DeliveryReport<string, List<InteractionModel>> deliveryReport = result as DeliveryReport<string, List<InteractionModel>>;
+
+                    if (deliveryReport?.Error?.IsError == true)
+                    {
+                        await _log.LogAsync($"Produce error: {deliveryReport.Error.Reason}");
+                    }
+                });
 
             await _realtimeNotiService.NotifyAsync(new NotificationModel
             {

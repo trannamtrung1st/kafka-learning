@@ -200,7 +200,7 @@ namespace TStore.Shared.Services
                 Items = orderEntity.OrderItems.Select(o => productMap[o.ProductId]).ToList()
             };
 
-            await _messagePublisher.PublishAsync(
+            await _messagePublisher.PublishAndWaitAsync(
                 EventConstants.Events.NewOrder,
                 orderModel.Id.ToString(),
                 orderModel);
@@ -220,7 +220,7 @@ namespace TStore.Shared.Services
                 Discount = discountAmount
             };
 
-            await _messagePublisher.PublishAsync(
+            await _messagePublisher.PublishAndWaitAsync(
                 EventConstants.Events.PromotionApplied,
                 orderId.ToString(),
                 promotionAppliedEvent);
@@ -240,7 +240,7 @@ namespace TStore.Shared.Services
                 ShipAmount = shipAmount
             };
 
-            await _messagePublisher.PublishAsync(
+            await _messagePublisher.PublishAndWaitAsync(
                 EventConstants.Events.ShipApplied,
                 orderId.ToString(),
                 shipAppliedEvent);

@@ -74,7 +74,7 @@ namespace TStore.InteractionApi.Consumers
                         isTimeout = true;
                     }
 
-                    if (batch.Count > 0 && (batch.Count >= _baseConfig.BatchSize || isTimeout))
+                    if (batch.Count > 0 && (batch.Count >= _baseConfig.ProcessingBatchSize || isTimeout))
                     {
                         await _log.LogAsync($"Consumer {_id} begins processing batch of {batch.Count} messages");
 
