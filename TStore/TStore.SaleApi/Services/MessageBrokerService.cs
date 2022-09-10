@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using TStore.SaleApi.Configs;
 using TStore.Shared.Constants;
 using TStore.Shared.Helpers;
 using TStore.Shared.Services;
@@ -22,21 +23,25 @@ namespace TStore.SaleApi.Services
         private bool _disposedValue;
         private readonly IAdminClient _adminClient;
         private readonly IApplicationLog _log;
+        private readonly TopicsConfigurations _topicsConfigs;
 
         public KafkaMessageBrokerService(IConfiguration configuration,
             IApplicationLog log)
         {
             _log = log;
 
-            AdminClientConfig config = new AdminClientConfig();
-            configuration.Bind("CommonAdminClientConfig", config);
+            _topicsConfigs = new TopicsConfigurations();
+            configuration.GetSection("TopicsConfigurations").Bind(_topicsConfigs);
+
+            AdminClientConfig adminConfig = new AdminClientConfig();
+            configuration.Bind("CommonAdminClientConfig", adminConfig);
 
             if (configuration.GetValue<bool>("StartFromVS"))
             {
-                config.FindCertIfNotFound();
+                adminConfig.FindCertIfNotFound();
             }
 
-            _adminClient = new AdminClientBuilder(config).Build();
+            _adminClient = new AdminClientBuilder(adminConfig).Build();
         }
 
         public async Task InitializeTopicsAsync()
@@ -79,7 +84,8 @@ namespace TStore.SaleApi.Services
                 topicSpecs.Add(new TopicSpecification
                 {
                     Name = EventConstants.Events.NewUnsavedInteraction,
-                    NumPartitions = 7
+                    NumPartitions = 7,
+                    Configs = _topicsConfigs.Interaction
                 });
             }
 
@@ -89,10 +95,7 @@ namespace TStore.SaleApi.Services
                 {
                     Name = EventConstants.Events.NewRecordedInteraction,
                     NumPartitions = 7,
-                    Configs = new Dictionary<string, string>
-                    {
-                        ["max.message.bytes"] = "1048588" // allow batch up to 1MB
-                    }
+                    Configs = _topicsConfigs.Interaction
                 });
             }
 

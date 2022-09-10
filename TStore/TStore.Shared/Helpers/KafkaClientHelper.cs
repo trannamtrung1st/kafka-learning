@@ -10,6 +10,12 @@ namespace TStore.Shared.Helpers
         public static void FindCertIfNotFound(this ClientConfig config)
         {
             bool exist = File.Exists(config.SslCertificateLocation);
+
+            if (exist)
+            {
+                return;
+            }
+
             string cd = Directory.GetCurrentDirectory();
             DirectoryInfo parent = Directory.GetParent(cd);
 
