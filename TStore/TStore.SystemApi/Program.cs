@@ -1,12 +1,11 @@
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
 using System.Threading.Tasks;
-using TStore.Shared.Persistence;
+using TStore.SystemApi.Services;
 
-namespace TStore.SaleApi
+namespace TStore.SystemApi
 {
     public class Program
     {
@@ -18,7 +17,7 @@ namespace TStore.SaleApi
             {
                 IServiceProvider provider = scope.ServiceProvider;
 
-                await MigrateDatabaseAsync(provider);
+                await SetupMessageBrokerAsync(provider);
             }
 
             app.Run();
@@ -31,10 +30,13 @@ namespace TStore.SaleApi
                     webBuilder.UseStartup<Startup>();
                 });
 
-        private static async Task MigrateDatabaseAsync(IServiceProvider provider)
+        private static async Task SetupMessageBrokerAsync(IServiceProvider provider)
         {
-            TStoreContext storeContext = provider.GetService<TStoreContext>();
-            await storeContext.Database.MigrateAsync();
+            IMessageBrokerService messageBrokerService = provider.GetService<IMessageBrokerService>();
+
+            await messageBrokerService.InitializeTopicsAsync();
+
+            await messageBrokerService.InitializeAclsAsync();
         }
     }
 }

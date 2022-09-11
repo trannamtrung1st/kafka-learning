@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace TStore.SaleApi.Configs
+namespace TStore.SystemApi.Configs
 {
     public class TopicsConfigurations
     {

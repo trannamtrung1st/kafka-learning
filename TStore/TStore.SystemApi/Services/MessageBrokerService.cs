@@ -5,24 +5,27 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using TStore.SaleApi.Configs;
 using TStore.Shared.Constants;
 using TStore.Shared.Helpers;
 using TStore.Shared.Services;
+using TStore.SystemApi.Configs;
 
-namespace TStore.SaleApi.Services
+namespace TStore.SystemApi.Services
 {
     public interface IMessageBrokerService
     {
         Task InitializeTopicsAsync();
         Task InitializeAclsAsync();
+        Task ClearRecordsAsync(string topic);
     }
 
     public class KafkaMessageBrokerService : IMessageBrokerService, IDisposable
     {
         private bool _disposedValue;
         private readonly IAdminClient _adminClient;
+        private readonly IConsumer<string, string> _offsetConsumer;
         private readonly IApplicationLog _log;
+        private readonly AdminClientConfig _adminConfig;
         private readonly TopicsConfigurations _topicsConfigs;
 
         public KafkaMessageBrokerService(IConfiguration configuration,
@@ -33,15 +36,19 @@ namespace TStore.SaleApi.Services
             _topicsConfigs = new TopicsConfigurations();
             configuration.GetSection("TopicsConfigurations").Bind(_topicsConfigs);
 
-            AdminClientConfig adminConfig = new AdminClientConfig();
-            configuration.Bind("CommonAdminClientConfig", adminConfig);
+            _adminConfig = new AdminClientConfig();
+            configuration.Bind("CommonAdminClientConfig", _adminConfig);
 
             if (configuration.GetValue<bool>("StartFromVS"))
             {
-                adminConfig.FindCertIfNotFound();
+                _adminConfig.FindCertIfNotFound();
             }
 
-            _adminClient = new AdminClientBuilder(adminConfig).Build();
+            _adminClient = new AdminClientBuilder(_adminConfig).Build();
+
+            ConsumerConfig consumerConfig = new ConsumerConfig(_adminConfig);
+            configuration.Bind("OffsetConsumerConfig", consumerConfig);
+            _offsetConsumer = new ConsumerBuilder<string, string>(consumerConfig).Build();
         }
 
         public async Task InitializeTopicsAsync()
@@ -190,6 +197,50 @@ namespace TStore.SaleApi.Services
             }
         }
 
+        private bool AclEquals(AclBinding src, AclBinding dest)
+        {
+            return src.Entry?.Principal == dest.Entry?.Principal
+                && src.Entry?.PermissionType == dest.Entry?.PermissionType
+                && src.Entry?.Operation == dest.Entry?.Operation
+                && src.Entry?.Host == dest.Entry?.Host
+                && src.Pattern?.ResourcePatternType == dest.Pattern?.ResourcePatternType
+                && src.Pattern?.Type == dest.Pattern?.Type
+                && src.Pattern?.Name == dest.Pattern?.Name;
+        }
+
+        public async Task ClearRecordsAsync(string topic)
+        {
+            Metadata metadata = _adminClient.GetMetadata(TimeSpan.FromSeconds(30));
+            TopicMetadata topicConfig = metadata.Topics.FirstOrDefault(t => t.Topic == topic);
+
+            if (topicConfig == null)
+            {
+                throw new Exception("Topic not found");
+            }
+
+            TopicPartitionOffset[] partitionOffsets = topicConfig.Partitions.Select(p =>
+            {
+                Partition partition = new Partition(p.PartitionId);
+                TopicPartition topicPartition = new TopicPartition(topic, partition);
+                WatermarkOffsets watermarksOffset = GetLatestOffset(topicPartition);
+                _log.LogAsync($"Partition {p.PartitionId}: {watermarksOffset.Low} - {watermarksOffset.High}").Wait();
+                Offset offset = new Offset(-1);
+                return new TopicPartitionOffset(topicPartition, offset);
+            }).ToArray();
+
+            List<DeleteRecordsResult> results = await _adminClient.DeleteRecordsAsync(partitionOffsets);
+
+            foreach (DeleteRecordsResult deletedPartition in results)
+            {
+                await _log.LogAsync($"Deleted all records of partition {deletedPartition.Partition.Value} of topic {topic}");
+            }
+        }
+
+        private WatermarkOffsets GetLatestOffset(TopicPartition topicPartition)
+        {
+            return _offsetConsumer.QueryWatermarkOffsets(topicPartition, TimeSpan.FromSeconds(30));
+        }
+
         protected virtual void Dispose(bool disposing)
         {
             if (!_disposedValue)
@@ -198,6 +249,7 @@ namespace TStore.SaleApi.Services
                 {
                     // TODO: dispose managed state (managed objects)
                     _adminClient?.Dispose();
+                    _offsetConsumer?.Dispose();
                 }
 
                 // TODO: free unmanaged resources (unmanaged objects) and override finalizer
@@ -218,17 +270,6 @@ namespace TStore.SaleApi.Services
             // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
             Dispose(disposing: true);
             GC.SuppressFinalize(this);
-        }
-
-        private bool AclEquals(AclBinding src, AclBinding dest)
-        {
-            return src.Entry?.Principal == dest.Entry?.Principal
-                && src.Entry?.PermissionType == dest.Entry?.PermissionType
-                && src.Entry?.Operation == dest.Entry?.Operation
-                && src.Entry?.Host == dest.Entry?.Host
-                && src.Pattern?.ResourcePatternType == dest.Pattern?.ResourcePatternType
-                && src.Pattern?.Type == dest.Pattern?.Type
-                && src.Pattern?.Name == dest.Pattern?.Name;
         }
     }
 }

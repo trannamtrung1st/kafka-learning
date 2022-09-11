@@ -32,6 +32,32 @@ services:
     volumes:
       - ./misc/certs:/certs:ro
 
+  system-api:
+    image: kafka-learning:ts-system-api-1.0
+    build:
+      context: .
+      dockerfile: TStore.SystemApi/Dockerfile
+    ports:
+      - target: 80
+        published: 10000
+      - target: 443
+        published: 10001
+    environment:
+      - RealtimeApiUrl=https://host.docker.internal:8001
+      - StartFromVS=false
+      - CommonAdminClientConfig__BootstrapServers=kafka:29093
+      - CommonAdminClientConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
+      - CommonAdminClientConfig__SslKeyPassword=123456
+      - CommonAdminClientConfig__SslCertificateLocation=/certs/kafka-client/tstore.crt
+      - CommonAdminClientConfig__SslKeyLocation=/certs/kafka-client/tstore.key
+      - ASPNETCORE_URLS=https://+:443;http://+:80
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=123456
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=/certs/ssl-cert.pfx
+    volumes:
+      - ./misc/certs:/certs:ro
+    depends_on:
+      - kafka
+      
   sale-api:
     image: kafka-learning:ts-sale-api-1.0
     build:
@@ -46,11 +72,6 @@ services:
       - CommonProducerConfig__SslKeyPassword=123456
       - CommonProducerConfig__SslCertificateLocation=/certs/kafka-client/tstore.crt
       - CommonProducerConfig__SslKeyLocation=/certs/kafka-client/tstore.key
-      - CommonAdminClientConfig__BootstrapServers=kafka:29093
-      - CommonAdminClientConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
-      - CommonAdminClientConfig__SslKeyPassword=123456
-      - CommonAdminClientConfig__SslCertificateLocation=/certs/kafka-client/tstore.crt
-      - CommonAdminClientConfig__SslKeyLocation=/certs/kafka-client/tstore.key
       - ASPNETCORE_URLS=https://+:443;http://+:80
       - ASPNETCORE_Kestrel__Certificates__Default__Password=123456
       - ASPNETCORE_Kestrel__Certificates__Default__Path=/certs/ssl-cert.pfx
@@ -60,6 +81,7 @@ services:
       - database
       - kafka
       - realtime-api
+      - system-api
     ports:
       - target: 80
         published: 5000
@@ -96,7 +118,7 @@ services:
       - database
       - kafka
       - realtime-api
-      - sale-api
+      - system-api
     ports:
       - target: 80
         published: 7000
@@ -121,7 +143,7 @@ services:
       - database
       - kafka
       - realtime-api
-      - sale-api
+      - interaction-api
     volumes:
       - ./misc/certs/kafka-broker/ca-root.crt:/certs/kafka-broker/ca-root.crt
       - ./misc/certs/kafka-client:/certs/kafka-client
@@ -144,7 +166,7 @@ services:
       - database
       - kafka
       - realtime-api
-      - sale-api
+      - interaction-api
     volumes:
       - ./misc/certs/kafka-broker/ca-root.crt:/certs/kafka-broker/ca-root.crt
       - ./misc/certs/kafka-client:/certs/kafka-client
@@ -167,7 +189,7 @@ services:
       - database
       - kafka
       - realtime-api
-      - sale-api
+      - interaction-api
     volumes:
       - ./misc/certs/kafka-broker/ca-root.crt:/certs/kafka-broker/ca-root.crt
       - ./misc/certs/kafka-client:/certs/kafka-client

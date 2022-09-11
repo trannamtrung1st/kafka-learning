@@ -4,9 +4,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using TStore.Shared.Constants;
-using TStore.Shared.Helpers;
+using TStore.Shared.Services;
+using TStore.SystemApi.Services;
 
-namespace TStore.SaleApi
+namespace TStore.SystemApi
 {
     public class Startup
     {
@@ -20,9 +21,15 @@ namespace TStore.SaleApi
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.RegisterTStoreCommonServices(
-                SystemConstants.ServiceIds.SaleApi,
-                Configuration.GetConnectionString("TStore"));
+            services.AddSingleton<IRealtimeNotiService, RealtimeNotiService>();
+
+            services.AddSingleton<IApplicationLog>(p =>
+            {
+                IRealtimeNotiService notiService = p.GetRequiredService<IRealtimeNotiService>();
+                return new ApplicationLog(SystemConstants.ServiceIds.SystemApi, notiService);
+            });
+
+            services.AddSingleton<IMessageBrokerService, KafkaMessageBrokerService>();
 
             services.AddSwaggerGen();
 
