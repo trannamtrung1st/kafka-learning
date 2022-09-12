@@ -50,13 +50,20 @@ services:
       - CommonAdminClientConfig__SslKeyPassword=123456
       - CommonAdminClientConfig__SslCertificateLocation=/certs/kafka-client/tstore.crt
       - CommonAdminClientConfig__SslKeyLocation=/certs/kafka-client/tstore.key
+      - CommonProducerConfig__BootstrapServers=kafka:29093
+      - CommonProducerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
+      - CommonProducerConfig__SslKeyPassword=123456
+      - CommonProducerConfig__SslCertificateLocation=/certs/kafka-client/tstore.crt
+      - CommonProducerConfig__SslKeyLocation=/certs/kafka-client/tstore.key
       - ASPNETCORE_URLS=https://+:443;http://+:80
       - ASPNETCORE_Kestrel__Certificates__Default__Password=123456
       - ASPNETCORE_Kestrel__Certificates__Default__Path=/certs/ssl-cert.pfx
     volumes:
       - ./misc/certs:/certs:ro
     depends_on:
+      - database
       - kafka
+      - realtime-api
       
   sale-api:
     image: kafka-learning:ts-sale-api-1.0

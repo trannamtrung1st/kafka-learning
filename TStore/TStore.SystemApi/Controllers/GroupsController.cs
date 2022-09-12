@@ -5,24 +5,26 @@ using TStore.SystemApi.Services;
 
 namespace TStore.SystemApi.Controllers
 {
-    [Route("api/system")]
+    [Route("api/groups")]
     [ApiController]
-    public class SystemController : ControllerBase
+    public class GroupsController : ControllerBase
     {
         private readonly IMessageBrokerService _messageBrokerService;
         private readonly IApplicationLog _log;
 
-        public SystemController(IMessageBrokerService messageBrokerService,
+        public GroupsController(IMessageBrokerService messageBrokerService,
             IApplicationLog log)
         {
             _messageBrokerService = messageBrokerService;
             _log = log;
         }
 
-        [HttpDelete("records/{topic}")]
-        public async Task<IActionResult> DeleteRecords(string topic)
+        [HttpDelete("{groupId}")]
+        public async Task<IActionResult> DeleteGroup(string groupId)
         {
-            await _messageBrokerService.ClearRecordsAsync(topic);
+            await _messageBrokerService.DeleteGroupAsync(groupId);
+
+            await _log.LogAsync($"Deleted group {groupId}");
 
             return NoContent();
         }

@@ -9,6 +9,7 @@ using TStore.Shared.Constants;
 using TStore.Shared.Helpers;
 using TStore.Shared.Services;
 using TStore.SystemApi.Configs;
+using TStore.SystemApi.Models;
 
 namespace TStore.SystemApi.Services
 {
@@ -17,21 +18,26 @@ namespace TStore.SystemApi.Services
         Task InitializeTopicsAsync();
         Task InitializeAclsAsync();
         Task ClearRecordsAsync(string topic);
+        Task CreateTombstoneAsync(TombstoneModel model);
+        Task DeleteGroupAsync(string groupId);
     }
 
     public class KafkaMessageBrokerService : IMessageBrokerService, IDisposable
     {
         private bool _disposedValue;
         private readonly IAdminClient _adminClient;
+        private readonly ICommonMessagePublisher _messagePublisher;
         private readonly IConsumer<string, string> _offsetConsumer;
         private readonly IApplicationLog _log;
         private readonly AdminClientConfig _adminConfig;
         private readonly TopicsConfigurations _topicsConfigs;
 
         public KafkaMessageBrokerService(IConfiguration configuration,
-            IApplicationLog log)
+            IApplicationLog log,
+            ICommonMessagePublisher messagePublisher)
         {
             _log = log;
+            _messagePublisher = messagePublisher;
 
             _topicsConfigs = new TopicsConfigurations();
             configuration.GetSection("TopicsConfigurations").Bind(_topicsConfigs);
@@ -91,7 +97,8 @@ namespace TStore.SystemApi.Services
                 topicSpecs.Add(new TopicSpecification
                 {
                     Name = EventConstants.Events.ProductUpdated,
-                    NumPartitions = 7
+                    NumPartitions = 1,
+                    Configs = _topicsConfigs.ProductUpdated
                 });
             }
 
@@ -243,6 +250,17 @@ namespace TStore.SystemApi.Services
             {
                 await _log.LogAsync($"Deleted all records of partition {deletedPartition.Partition.Value} of topic {topic}");
             }
+        }
+
+        public async Task CreateTombstoneAsync(TombstoneModel model)
+        {
+            // [DEMO] create new tombstone (delete marker) for compacted topic
+            await _messagePublisher.PublishAndWaitAsync<string, Null>(model.Topic, model.Key, null);
+        }
+
+        public async Task DeleteGroupAsync(string groupId)
+        {
+            await _adminClient.DeleteGroupsAsync(new[] { groupId });
         }
 
         private WatermarkOffsets GetLatestOffset(TopicPartition topicPartition)
