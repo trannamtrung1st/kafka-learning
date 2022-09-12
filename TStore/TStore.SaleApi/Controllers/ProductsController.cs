@@ -24,5 +24,13 @@ namespace TStore.SaleApi.Controllers
 
             return Ok(products);
         }
+
+        [HttpPut("")]
+        public async Task<IActionResult> UpdateProduct([FromBody] ProductModel model)
+        {
+            await _productService.UpdateProductAsync(model);
+
+            return NoContent();
+        }
     }
 }

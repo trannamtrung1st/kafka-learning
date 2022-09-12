@@ -19,4 +19,9 @@ export class ProductService {
     const url = parseUrl('/api/products/filter', dynamicUrls.saleApiUrl);
     return this._httpClient.post<ProductModel[]>(url.toString(), filter);
   }
+
+  updateProduct(product: ProductModel) {
+    const url = parseUrl('/api/products', dynamicUrls.saleApiUrl);
+    return this._httpClient.put(url.toString(), product);
+  }
 }

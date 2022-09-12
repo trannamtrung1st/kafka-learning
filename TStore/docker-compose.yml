@@ -250,6 +250,28 @@ services:
       - ./misc/certs/kafka-broker/ca-root.crt:/certs/kafka-broker/ca-root.crt
       - ./misc/certs/kafka-client:/certs/kafka-client
   
+  external-product-sync:
+    image: kafka-learning:ts-external-product-sync-1.0
+    build:
+      context: .
+      dockerfile: Consumers/TStore.Consumers.ExternalProductSync/Dockerfile
+    environment:
+      - RealtimeApiUrl=https://host.docker.internal:8001
+      - StartFromVS=false
+      - ExternalProductSyncConsumerConfig__BootstrapServers=kafka:29093
+      - ExternalProductSyncConsumerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
+      - ExternalProductSyncConsumerConfig__SslKeyPassword=123456
+      - ExternalProductSyncConsumerConfig__SslCertificateLocation=/certs/kafka-client/tstore.crt
+      - ExternalProductSyncConsumerConfig__SslKeyLocation=/certs/kafka-client/tstore.key
+    depends_on:
+      - database
+      - kafka
+      - realtime-api
+      - sale-api
+    volumes:
+      - ./misc/certs/kafka-broker/ca-root.crt:/certs/kafka-broker/ca-root.crt
+      - ./misc/certs/kafka-client:/certs/kafka-client
+  
   reverse-proxy:
     image: kafka-learning:ts-reverse-proxy-1.0
     build:

@@ -9,6 +9,7 @@
             public const string ShipApplied = "ShipApplied";
             public const string NewUnsavedInteraction = "NewUnsavedInteraction";
             public const string NewRecordedInteraction = "NewRecordedInteraction";
+            public const string ProductUpdated = "ProductUpdated";
         }
     }
 }

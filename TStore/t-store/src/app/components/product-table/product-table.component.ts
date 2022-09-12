@@ -77,8 +77,41 @@ export class ProductTableComponent implements OnInit {
     this._submitCreateOrder(this.selectedProducts);
   }
 
+  openProductUpdate(product: ProductModel) {
+    const newName = prompt(`Enter a new name (${product.name}): `)?.trim();
+    const newPrice = Number.parseFloat(prompt(`Enter a new price (${product.price}): `) || '');
+    if (!newName || isNaN(newPrice)) {
+      this._messageService.error('Invalid product data');
+    } else {
+      const updatedProduct = { ...product, name: newName, price: newPrice };
+      this._submitUpdateProduct(updatedProduct);
+    }
+  }
+
   private _checkSelectedProducts() {
     this.selectedProducts = this.products?.filter((item, idx) => this.productSelections[idx]) || [];
+  }
+
+  private _submitUpdateProduct(updatedProduct: ProductModel) {
+    this.loading = true;
+
+    const submitFinish = () => this.loading = false;
+
+    this._productService.updateProduct(updatedProduct).subscribe({
+      next: () => {
+        const product = this.originalProducts?.find(p => p.id === updatedProduct.id);
+        if (product) {
+          Object.assign(product, updatedProduct);
+        }
+
+        this._messageService.success('Updated product successfully');
+      },
+      error: (err) => {
+        this._messageService.error('Failed to update product');
+        submitFinish();
+      },
+      complete: () => submitFinish()
+    });
   }
 
   private _submitCreateOrder(selectedProducts: ProductModel[]) {

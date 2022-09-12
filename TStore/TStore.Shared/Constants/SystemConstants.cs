@@ -12,6 +12,7 @@
             public const string InteractionApi = "InteractionApi";
             public const string SaleApi = "SaleApi";
             public const string SystemApi = "SystemApi";
+            public const string ExternalProductSync = "ExternalProductSync";
         }
     }
 }
