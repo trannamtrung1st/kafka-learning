@@ -1,7 +1,9 @@
 ﻿using Confluent.Kafka;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,14 +22,19 @@ namespace TStore.Consumers.PromotionCalculator
         private readonly IServiceProvider _serviceProvider;
         private readonly IApplicationLog _log;
         private readonly AppConsumerConfig _baseConfig;
+        private readonly MemoryCache _memoryCache;
+        private readonly IOptions<MemoryCacheOptions> _memoryCacheOptions;
 
         public Worker(IServiceProvider serviceProvider, IConfiguration configuration,
-            IApplicationLog log)
+            IApplicationLog log,
+            IOptions<MemoryCacheOptions> memCacheOptions)
         {
             _serviceProvider = serviceProvider;
             _configuration = configuration;
             _log = log;
             _baseConfig = new AppConsumerConfig();
+            _memoryCacheOptions = memCacheOptions;
+            _memoryCache = new MemoryCache(memCacheOptions);
             _configuration.Bind("PromotionCalculatorConsumerConfig", _baseConfig);
 
             if (_configuration.GetValue<bool>("StartFromVS"))
@@ -55,13 +62,23 @@ namespace TStore.Consumers.PromotionCalculator
                         {
                             ConsumeResult<string, OrderModel> message = consumer.Consume(default(CancellationToken));
 
-                            await _log.LogAsync($"Consumer {idx} begins handle message {message.Message.Timestamp.UtcDateTime}");
-
-                            using (IServiceScope scope = _serviceProvider.CreateScope())
+                            // [DEMO] idempotence
+                            if (_memoryCache.TryGetValue(message.Message.Key, out bool exists))
                             {
-                                await HandleNewOrderAsync(
-                                    Guid.Parse(message.Message.Key),
-                                    message.Message.Value);
+                                await _log.LogAsync($"Key {message.Message.Key} is duplicated, will skip for now");
+                            }
+                            else
+                            {
+                                await _log.LogAsync($"Consumer {idx} begins handle message {message.Message.Timestamp.UtcDateTime}");
+
+                                using (IServiceScope scope = _serviceProvider.CreateScope())
+                                {
+                                    await HandleNewOrderAsync(
+                                        Guid.Parse(message.Message.Key),
+                                        message.Message.Value);
+                                }
+
+                                CacheKey(message.Message.Key);
                             }
 
                             try
@@ -93,6 +110,20 @@ namespace TStore.Consumers.PromotionCalculator
             double discount = await orderService.ApplyDiscountAsync(key, orderModel);
 
             await _log.LogAsync($"Finish applying discount of ${discount} for order {orderModel.Id}");
+        }
+
+        private void CacheKey(string key)
+        {
+            if (_memoryCache.Count > _memoryCacheOptions.Value.SizeLimit * 0.9)
+            {
+                _memoryCache.Compact(0.25);
+            }
+
+            // [DEMO] idempotence
+            _memoryCache.Set(key, true,
+                new MemoryCacheEntryOptions()
+                    .SetSize(1)
+                    .SetSlidingExpiration(TimeSpan.FromMinutes(1)));
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)

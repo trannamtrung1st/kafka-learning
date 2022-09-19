@@ -79,6 +79,7 @@ services:
       - CommonProducerConfig__SslKeyPassword=123456
       - CommonProducerConfig__SslCertificateLocation=/certs/kafka-client/tstore.crt
       - CommonProducerConfig__SslKeyLocation=/certs/kafka-client/tstore.key
+      # - CommonProducerConfig__ProduceDuplication=true
       - ASPNETCORE_URLS=https://+:443;http://+:80
       - ASPNETCORE_Kestrel__Certificates__Default__Password=123456
       - ASPNETCORE_Kestrel__Certificates__Default__Path=/certs/ssl-cert.pfx

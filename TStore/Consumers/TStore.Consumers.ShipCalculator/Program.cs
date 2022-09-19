@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -24,6 +25,11 @@ namespace TStore.Consumers.ShipCalculator
                     services.RegisterTStoreCommonServices(
                         SystemConstants.ServiceIds.ShipCalculator,
                         configuration.GetConnectionString("TStore"));
+
+                    services.Configure<MemoryCacheOptions>(opt =>
+                    {
+                        opt.SizeLimit = 1000;
+                    });
                 });
     }
 }

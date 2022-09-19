@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
+using TStore.Shared.Configs;
 using TStore.Shared.Helpers;
 using TStore.Shared.Serdes;
 
@@ -18,11 +19,11 @@ namespace TStore.Shared.Services
     {
         private readonly ConcurrentDictionary<string, IClient> _producerMap;
         private bool _disposedValue;
-        private readonly ProducerConfig _baseConfig;
+        private readonly AppProducerConfig _baseConfig;
 
         public KafkaCommonMessagePublisher(IConfiguration configuration)
         {
-            _baseConfig = new ProducerConfig();
+            _baseConfig = new AppProducerConfig();
             configuration.Bind("CommonProducerConfig", _baseConfig);
 
             if (configuration.GetValue<bool>("StartFromVS"))
@@ -38,12 +39,16 @@ namespace TStore.Shared.Services
             IProducer<TKey, TValue> producer = GetProducer<TKey, TValue>(eventName);
 
             // [DEMO] async call, provide delivery result callback
-            producer.Produce(eventName, new Message<TKey, TValue>()
+            Action produceAct = () => producer.Produce(eventName, new Message<TKey, TValue>()
             {
                 Key = key,
                 Value = value,
                 Timestamp = new Timestamp(DateTimeOffset.UtcNow),
             }, deliveryHandler);
+
+            produceAct();
+
+            if (_baseConfig.ProduceDuplication) produceAct();
 
             return Task.CompletedTask;
         }
@@ -52,12 +57,16 @@ namespace TStore.Shared.Services
         {
             IProducer<TKey, TValue> producer = GetProducer<TKey, TValue>(eventName);
 
-            DeliveryResult<TKey, TValue> result = await producer.ProduceAsync(eventName, new Message<TKey, TValue>()
+            Func<Task<DeliveryResult<TKey, TValue>>> produceAct = async () => await producer.ProduceAsync(eventName, new Message<TKey, TValue>()
             {
                 Key = key,
                 Value = value,
                 Timestamp = new Timestamp(DateTimeOffset.UtcNow),
             });
+
+            DeliveryResult<TKey, TValue> result = await produceAct();
+
+            if (_baseConfig.ProduceDuplication) await produceAct();
 
             return result;
         }
