@@ -26,7 +26,7 @@ namespace TStore.SystemApi.Services
     {
         private bool _disposedValue;
         private readonly IAdminClient _adminClient;
-        private readonly ICommonMessagePublisher _messagePublisher;
+        private readonly ITransactionalMessagePublisher _messagePublisher;
         private readonly IConsumer<string, string> _offsetConsumer;
         private readonly IApplicationLog _log;
         private readonly AdminClientConfig _adminConfig;
@@ -34,7 +34,7 @@ namespace TStore.SystemApi.Services
 
         public KafkaMessageBrokerService(IConfiguration configuration,
             IApplicationLog log,
-            ICommonMessagePublisher messagePublisher)
+            ITransactionalMessagePublisher messagePublisher)
         {
             _log = log;
             _messagePublisher = messagePublisher;
@@ -122,6 +122,15 @@ namespace TStore.SystemApi.Services
                 });
             }
 
+            if (!topicNames.Contains(EventConstants.Events.SampleEvents))
+            {
+                topicSpecs.Add(new TopicSpecification
+                {
+                    Name = EventConstants.Events.SampleEvents,
+                    NumPartitions = 1
+                });
+            }
+
             if (topicSpecs.Count > 0)
             {
                 await _adminClient.CreateTopicsAsync(topicSpecs);
@@ -157,8 +166,17 @@ namespace TStore.SystemApi.Services
                 Principal = "User:consumer"
             };
 
+            AccessControlEntry allowTransactionalProducerRead = new AccessControlEntry
+            {
+                Host = "*",
+                Operation = AclOperation.Read,
+                PermissionType = AclPermissionType.Allow,
+                Principal = "User:transproducer"
+            };
+
             List<AclBinding> aclBindings = new List<AclBinding>()
             {
+                // Producer ACL
                 new AclBinding
                 {
                     Entry = new AccessControlEntry
@@ -175,6 +193,46 @@ namespace TStore.SystemApi.Services
                         ResourcePatternType = ResourcePatternType.Literal
                     }
                 },
+
+                // Transactional Producer ACL
+                new AclBinding
+                {
+                    Entry = new AccessControlEntry
+                    {
+                        Host = "*",
+                        Operation = AclOperation.Write,
+                        PermissionType = AclPermissionType.Allow,
+                        Principal = "User:transproducer"
+                    },
+                    Pattern = new ResourcePattern
+                    {
+                        Name = "*",
+                        Type = ResourceType.Topic,
+                        ResourcePatternType = ResourcePatternType.Literal
+                    }
+                },
+                new AclBinding
+                {
+                    Entry = allowTransactionalProducerRead,
+                    Pattern = new ResourcePattern
+                    {
+                        Name = "*",
+                        Type = ResourceType.Group,
+                        ResourcePatternType = ResourcePatternType.Literal
+                    }
+                },
+                new AclBinding
+                {
+                    Entry = allowTransactionalProducerRead,
+                    Pattern = new ResourcePattern
+                    {
+                        Name = "*",
+                        Type = ResourceType.Topic,
+                        ResourcePatternType = ResourcePatternType.Literal
+                    }
+                },
+
+                // Consumer ACL
                 new AclBinding
                 {
                     Entry = allowConsumerRead,

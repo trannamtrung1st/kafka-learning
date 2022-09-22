@@ -9,6 +9,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\TStore.InteractionApi\TStore.InteractionApi.csproj" />
     <ProjectReference Include="..\TStore.Shared\TStore.Shared.csproj" />
   </ItemGroup>
 

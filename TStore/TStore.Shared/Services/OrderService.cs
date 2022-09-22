@@ -21,13 +21,13 @@ namespace TStore.Shared.Services
     public class OrderService : IOrderService
     {
         private readonly IRealtimeNotiService _realtimeNotiService;
-        private readonly ICommonMessagePublisher _messagePublisher;
+        private readonly ITransactionalMessagePublisher _messagePublisher;
         private readonly IOrderRepository _orderRepository;
         private readonly IProductRepository _productRepository;
 
         public OrderService(
             IRealtimeNotiService realtimeNotiService,
-            ICommonMessagePublisher messagePublisher,
+            ITransactionalMessagePublisher messagePublisher,
             IOrderRepository orderRepository,
             IProductRepository productRepository)
         {
@@ -39,6 +39,8 @@ namespace TStore.Shared.Services
 
         public async Task<double> ApplyDiscountAsync(Guid orderId, OrderModel order)
         {
+            using ITransaction transaction = await _orderRepository.UnitOfWork.BeginTransactionAsync();
+
             await Task.Delay(new Random().Next(2000, 5000));
 
             double discount = 0;
@@ -69,11 +71,15 @@ namespace TStore.Shared.Services
 
             await PublishPromotionAppliedAsync(orderId, discount);
 
+            await transaction.CommitAsync();
+
             return discount;
         }
 
         public async Task<double> ApplyShipAsync(Guid orderId, OrderModel order)
         {
+            using ITransaction transaction = await _orderRepository.UnitOfWork.BeginTransactionAsync();
+
             double shipAmount = 0;
 
             if (!order.UserName.Contains("T")
@@ -102,11 +108,15 @@ namespace TStore.Shared.Services
 
             await PublishShipAppliedAsync(orderId, shipAmount);
 
+            await transaction.CommitAsync();
+
             return shipAmount;
         }
 
         public async Task<Guid> CreateOrderAsync(SubmitOrderModel order)
         {
+            using ITransaction transaction = await _orderRepository.UnitOfWork.BeginTransactionAsync();
+
             Dictionary<Guid, double> productPriceMap = _productRepository.Get().Where(p => order.ProductIds.Contains(p.Id))
                 .Select(p => new
                 {
@@ -132,6 +142,8 @@ namespace TStore.Shared.Services
             await _orderRepository.UnitOfWork.SaveChangesAsync();
 
             await PublishNewOrderAsync(orderEntity);
+
+            await transaction.CommitAsync();
 
             return orderEntity.Id;
         }
@@ -203,7 +215,7 @@ namespace TStore.Shared.Services
             await _messagePublisher.PublishAndWaitAsync(
                 EventConstants.Events.NewOrder,
                 orderModel.Id.ToString(),
-                orderModel);
+                orderModel as object);
 
             await _realtimeNotiService.NotifyAsync(new NotificationModel
             {
@@ -223,7 +235,7 @@ namespace TStore.Shared.Services
             await _messagePublisher.PublishAndWaitAsync(
                 EventConstants.Events.PromotionApplied,
                 orderId.ToString(),
-                promotionAppliedEvent);
+                promotionAppliedEvent as object);
 
             await _realtimeNotiService.NotifyAsync(new NotificationModel
             {
@@ -243,7 +255,7 @@ namespace TStore.Shared.Services
             await _messagePublisher.PublishAndWaitAsync(
                 EventConstants.Events.ShipApplied,
                 orderId.ToString(),
-                shipAppliedEvent);
+                shipAppliedEvent as object);
 
             await _realtimeNotiService.NotifyAsync(new NotificationModel
             {

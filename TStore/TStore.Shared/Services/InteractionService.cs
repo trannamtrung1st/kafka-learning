@@ -29,31 +29,31 @@ namespace TStore.Shared.Services
 
         private readonly IInteractionRepository _interactionRepository;
         private readonly IInteractionReportRepository _interactionReportRepository;
-        private readonly ICommonMessagePublisher _commonMessagePublisher;
+        private readonly ITransactionalMessagePublisher _messagePublisher;
         private readonly IRealtimeNotiService _realtimeNotiService;
         private readonly IApplicationLog _log;
 
         public InteractionService(IInteractionRepository interactionRepository,
             IInteractionReportRepository interactionReportRepository,
-            ICommonMessagePublisher commonMessagePublisher,
+            ITransactionalMessagePublisher messagePublisher,
             IRealtimeNotiService realtimeNotiService,
             IApplicationLog log)
         {
             _interactionRepository = interactionRepository;
             _interactionReportRepository = interactionReportRepository;
-            _commonMessagePublisher = commonMessagePublisher;
+            _messagePublisher = messagePublisher;
             _realtimeNotiService = realtimeNotiService;
             _log = log;
         }
 
         public async Task PublishNewUnsavedInteractionAsync(InteractionModel interactionModel)
         {
-            await _commonMessagePublisher.PublishAsync(
+            await _messagePublisher.PublishAsync(
                 EventConstants.Events.NewUnsavedInteraction,
                 Guid.NewGuid().ToString(),
-                interactionModel, async result =>
+                interactionModel as object, async result =>
                 {
-                    DeliveryReport<string, InteractionModel> deliveryReport = result as DeliveryReport<string, InteractionModel>;
+                    DeliveryReport<string, object> deliveryReport = result as DeliveryReport<string, object>;
 
                     if (deliveryReport?.Error?.IsError == true)
                     {
@@ -95,12 +95,12 @@ FROM sys.columns A"
                 interactionModels[i].Time = entities[i].Time;
             }
 
-            await _commonMessagePublisher.PublishAsync(
+            await _messagePublisher.PublishAsync(
                 EventConstants.Events.NewRecordedInteraction,
                 Guid.NewGuid().ToString(),
-                interactionModels, async result =>
+                interactionModels as object, async result =>
                 {
-                    DeliveryReport<string, List<InteractionModel>> deliveryReport = result as DeliveryReport<string, List<InteractionModel>>;
+                    DeliveryReport<string, object> deliveryReport = result as DeliveryReport<string, object>;
 
                     if (deliveryReport?.Error?.IsError == true)
                     {

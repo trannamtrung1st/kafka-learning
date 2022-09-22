@@ -23,6 +23,8 @@ namespace TStore.Consumers.ExternalProductSync
 
                     services.AddSingleton<IRealtimeNotiService, RealtimeNotiService>();
 
+                    services.AddSingleton<IKafkaProducerManager, KafkaProducerManager>();
+
                     services.AddSingleton<IApplicationLog>(p =>
                     {
                         IRealtimeNotiService notiService = p.GetRequiredService<IRealtimeNotiService>();

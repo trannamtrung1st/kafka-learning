@@ -10,6 +10,7 @@
             public const string NewUnsavedInteraction = "NewUnsavedInteraction";
             public const string NewRecordedInteraction = "NewRecordedInteraction";
             public const string ProductUpdated = "ProductUpdated";
+            public const string SampleEvents = "SampleEvents";
         }
     }
 }

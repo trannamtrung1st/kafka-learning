@@ -74,12 +74,16 @@ services:
       - ConnectionStrings__TStore=Server=host.docker.internal,1434;Database=KafkaTStore;Trusted_Connection=False;User Id=sa;Password=z@123456!
       - RealtimeApiUrl=https://host.docker.internal:8001
       - StartFromVS=false
+      # - ProductUpdatedDelay=10000
       - CommonProducerConfig__BootstrapServers=kafka:29093
       - CommonProducerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
       - CommonProducerConfig__SslKeyPassword=123456
       - CommonProducerConfig__SslCertificateLocation=/certs/kafka-client/tstore.crt
       - CommonProducerConfig__SslKeyLocation=/certs/kafka-client/tstore.key
       # - CommonProducerConfig__ProduceDuplication=true
+      # - CommonProducerConfig__DefaultPoolSize=1
+      # - CommonProducerConfig__TransactionTimeoutMs=7000
+      # - CommonProducerConfig__MessageTimeoutMs=5000
       - ASPNETCORE_URLS=https://+:443;http://+:80
       - ASPNETCORE_Kestrel__Certificates__Default__Password=123456
       - ASPNETCORE_Kestrel__Certificates__Default__Path=/certs/ssl-cert.pfx
@@ -271,6 +275,14 @@ services:
       - ExternalProductSyncConsumerConfig__SslKeyPassword=123456
       - ExternalProductSyncConsumerConfig__SslCertificateLocation=/certs/kafka-client/tstore.crt
       - ExternalProductSyncConsumerConfig__SslKeyLocation=/certs/kafka-client/tstore.key
+      - ExternalProductProducerConfig__BootstrapServers=kafka:29093
+      - ExternalProductProducerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
+      - ExternalProductProducerConfig__SslKeyPassword=123456
+      - ExternalProductProducerConfig__SslCertificateLocation=/certs/kafka-client/tstore.crt
+      - ExternalProductProducerConfig__SslKeyLocation=/certs/kafka-client/tstore.key
+      # - ExternalProductProducerConfig__DefaultPoolSize=1
+      # - ExternalProductProducerConfig__TransactionTimeoutMs=7000
+      # - ExternalProductProducerConfig__MessageTimeoutMs=5000
     depends_on:
       - database
       - kafka
@@ -307,9 +319,10 @@ services:
       context: .
       dockerfile: misc/kafka/Dockerfile
     environment:
-      - KAFKA_OPTS=${KAFKA_OPTS:--Djava.security.auth.login.config=/kafka/config-override/kafka_server_jaas.conf} # Setup SASL using Jaas static file
+      - KAFKA_OPTS=${KAFKA_OPTS:--Djava.security.auth.login.config=/kafka/config-override/kafka_server_jaas.conf -Dzookeeper.sasl.client=false} # Setup SASL using Jaas static file
     volumes:
       - ./misc/kafka/config:/kafka/config-override
+      - ./misc/kafka/scripts:/kafka/scripts
       - ./misc/certs/kafka-broker:/kafka/certs/broker
       - ./misc/certs/kafka-client:/kafka/certs/client
     ports:

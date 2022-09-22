@@ -23,7 +23,9 @@ namespace TStore.SystemApi
         {
             services.AddSingleton<IRealtimeNotiService, RealtimeNotiService>();
 
-            services.AddSingleton<ICommonMessagePublisher, KafkaCommonMessagePublisher>();
+            services.AddSingleton<IKafkaProducerManager, KafkaProducerManager>();
+
+            services.AddSingleton<ITransactionalMessagePublisher, KafkaCommonMessagePublisher>();
 
             services.AddSingleton<IApplicationLog>(p =>
             {

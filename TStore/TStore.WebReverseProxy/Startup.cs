@@ -19,7 +19,7 @@ namespace TStore.WebReverseProxy
         // For more information on how to configure your application, visit https://go.microsoft.com/fwlink/?LinkID=398940
         public void ConfigureServices(IServiceCollection services)
         {
-            var proxyBuilder = services.AddReverseProxy();
+            IReverseProxyBuilder proxyBuilder = services.AddReverseProxy();
             // Initialize the reverse proxy from the "ReverseProxy" section of configuration
             proxyBuilder.LoadFromConfig(Configuration.GetSection("ReverseProxy"));
 

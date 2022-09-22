@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json;
 using System;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using TStore.Shared.Configs;
@@ -21,24 +20,24 @@ namespace TStore.Consumers.ExternalProductSync
         private readonly IConfiguration _configuration;
         private readonly IServiceProvider _serviceProvider;
         private readonly IApplicationLog _log;
-        private readonly AppConsumerConfig _baseConfig;
-
-        // [DEMO]
-        private HashSet<Guid> _existenceSet;
+        private readonly AppConsumerConfig _baseConsumerConfig;
+        private readonly AppProducerConfig _baseProducerConfig;
 
         public Worker(IServiceProvider serviceProvider, IConfiguration configuration,
             IApplicationLog log)
         {
-            _existenceSet = new HashSet<Guid>();
             _serviceProvider = serviceProvider;
             _configuration = configuration;
             _log = log;
-            _baseConfig = new AppConsumerConfig();
-            _configuration.Bind("ExternalProductSyncConsumerConfig", _baseConfig);
+            _baseConsumerConfig = new AppConsumerConfig();
+            _configuration.Bind("ExternalProductSyncConsumerConfig", _baseConsumerConfig);
+            _baseProducerConfig = new AppProducerConfig();
+            _configuration.Bind("ExternalProductProducerConfig", _baseProducerConfig);
 
             if (_configuration.GetValue<bool>("StartFromVS"))
             {
-                _baseConfig.FindCertIfNotFound();
+                _baseConsumerConfig.FindCertIfNotFound();
+                _baseProducerConfig.FindCertIfNotFound();
             }
         }
 
@@ -48,8 +47,10 @@ namespace TStore.Consumers.ExternalProductSync
             {
                 try
                 {
+                    IKafkaProducerManager kafkaProducerManager = _serviceProvider.GetService<IKafkaProducerManager>();
+
                     using (IConsumer<string, ProductModel> consumer
-                        = new ConsumerBuilder<string, ProductModel>(_baseConfig)
+                        = new ConsumerBuilder<string, ProductModel>(_baseConsumerConfig)
                             .SetValueDeserializer(new SimpleJsonSerdes<ProductModel>())
                             .Build())
                     {
@@ -61,23 +62,55 @@ namespace TStore.Consumers.ExternalProductSync
                         {
                             ConsumeResult<string, ProductModel> message = consumer.Consume(default(CancellationToken));
 
-                            if (!_existenceSet.Add(message.Message.Value.Id))
-                            {
-                                await _log.LogAsync($"Consumer {idx} begins UPDATING product {JsonConvert.SerializeObject(message.Message.Value)}");
-                            }
-                            else
-                            {
-                                await _log.LogAsync($"Consumer {idx} begins CREATING product {JsonConvert.SerializeObject(message.Message.Value)}");
-                            }
+                            TransactionalProducerWrapper<string, string> producerWrapper = kafkaProducerManager
+                                .GetTransactionalProducerFromPool<string, string>(
+                                    _baseProducerConfig, _baseProducerConfig.DefaultPoolSize,
+                                    nameof(ExternalProductSync), $"_{message.Message.Key}");
 
-                            try
+                            await producerWrapper.WrapTransactionAsync(async () =>
                             {
-                                consumer.Commit();
-                            }
-                            catch (Exception ex)
-                            {
-                                await _log.LogAsync(ex.Message);
-                            }
+                                producerWrapper.BeginTransaction();
+
+                                await _log.LogAsync($"Enter transaction {producerWrapper.TransactionalId}");
+
+                                try
+                                {
+                                    await _log.LogAsync($"Consumer {idx} begins to transform product {JsonConvert.SerializeObject(message.Message.Value)}");
+
+                                    for (int i = 0; i < 10; i++)
+                                    {
+                                        await producerWrapper.ProduceAsync(EventConstants.Events.SampleEvents,
+                                            new Message<string, string>
+                                            {
+                                                Key = message.Message.Key,
+                                                Value = $"Sample value {i}"
+                                            });
+
+                                        await Task.Delay(1000);
+                                    }
+
+                                    producerWrapper.SendOffsetsToTransaction(
+                                        new[] { message.TopicPartitionOffset },
+                                        consumer.ConsumerGroupMetadata,
+                                        TimeSpan.FromSeconds(30));
+
+                                    producerWrapper.CommitTransaction();
+
+                                    await _log.LogAsync($"Commit transaction {producerWrapper.TransactionalId}");
+
+                                    await _log.LogAsync($"Consumer {idx} finishes processing product {message.Message.Value.Id}");
+                                }
+                                catch (Exception ex)
+                                {
+                                    producerWrapper.AbortTransaction();
+
+                                    await _log.LogAsync($"Abort transaction {producerWrapper.TransactionalId}");
+
+                                    throw ex;
+                                }
+                            });
+
+                            kafkaProducerManager.Release(producerWrapper);
                         }
 
                         consumer.Close();
@@ -96,7 +129,7 @@ namespace TStore.Consumers.ExternalProductSync
         {
             await _log.LogAsync("[EXTERNAL PRODUCT SYNC]");
 
-            for (int i = 0; i < _baseConfig.ConsumerCount; i++)
+            for (int i = 0; i < _baseConsumerConfig.ConsumerCount; i++)
             {
                 StartConsumerThread(i);
             }

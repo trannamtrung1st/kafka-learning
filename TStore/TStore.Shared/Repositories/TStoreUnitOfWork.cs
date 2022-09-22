@@ -1,5 +1,4 @@
-﻿using System.Threading.Tasks;
-using TStore.Shared.Persistence;
+﻿using TStore.Shared.Persistence;
 
 namespace TStore.Shared.Repositories
 {
@@ -7,18 +6,10 @@ namespace TStore.Shared.Repositories
     {
     }
 
-    public class TStoreUnitOfWork : ITStoreUnitOfWork
+    public class TStoreUnitOfWork : BaseUnitOfWork<TStoreContext>, ITStoreUnitOfWork
     {
-        protected readonly TStoreContext _storeContext;
-
-        public TStoreUnitOfWork(TStoreContext storeContext)
+        public TStoreUnitOfWork(TStoreContext dbContext) : base(dbContext)
         {
-            _storeContext = storeContext;
-        }
-
-        public Task<int> SaveChangesAsync()
-        {
-            return _storeContext.SaveChangesAsync();
         }
     }
 }
