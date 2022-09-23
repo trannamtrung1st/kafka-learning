@@ -26,7 +26,7 @@ namespace TStore.SystemApi.Services
     {
         private bool _disposedValue;
         private readonly IAdminClient _adminClient;
-        private readonly ITransactionalMessagePublisher _messagePublisher;
+        private readonly IMessagePublisher _messagePublisher;
         private readonly IConsumer<string, string> _offsetConsumer;
         private readonly IApplicationLog _log;
         private readonly AdminClientConfig _adminConfig;
@@ -34,7 +34,7 @@ namespace TStore.SystemApi.Services
 
         public KafkaMessageBrokerService(IConfiguration configuration,
             IApplicationLog log,
-            ITransactionalMessagePublisher messagePublisher)
+            IMessagePublisher messagePublisher)
         {
             _log = log;
             _messagePublisher = messagePublisher;
@@ -98,7 +98,17 @@ namespace TStore.SystemApi.Services
                 {
                     Name = EventConstants.Events.ProductUpdated,
                     NumPartitions = 1,
-                    Configs = _topicsConfigs.ProductUpdated
+                    Configs = _topicsConfigs.ProductTopics
+                });
+            }
+
+            if (!topicNames.Contains(EventConstants.Events.ProductCreated))
+            {
+                topicSpecs.Add(new TopicSpecification
+                {
+                    Name = EventConstants.Events.ProductCreated,
+                    NumPartitions = 2,
+                    Configs = _topicsConfigs.ProductTopics
                 });
             }
 

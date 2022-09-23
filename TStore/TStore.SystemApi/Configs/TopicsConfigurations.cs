@@ -5,6 +5,6 @@ namespace TStore.SystemApi.Configs
     public class TopicsConfigurations
     {
         public Dictionary<string, string> Interaction { get; set; }
-        public Dictionary<string, string> ProductUpdated { get; set; }
+        public Dictionary<string, string> ProductTopics { get; set; }
     }
 }

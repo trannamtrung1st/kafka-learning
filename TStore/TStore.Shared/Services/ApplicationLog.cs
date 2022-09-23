@@ -1,4 +1,6 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace TStore.Shared.Services
 {
@@ -7,9 +9,12 @@ namespace TStore.Shared.Services
         Task LogAsync(string message);
     }
 
-    public class ApplicationLog : IApplicationLog
+    public class ApplicationLog : IApplicationLog, IDisposable
     {
         private readonly IRealtimeNotiService _realtimeNotiService;
+        private readonly Queue<string> _messageQueue;
+        private System.Timers.Timer _timer;
+        private bool _disposedValue;
 
         public string Id { get; }
 
@@ -17,12 +22,69 @@ namespace TStore.Shared.Services
             IRealtimeNotiService realtimeNotiService)
         {
             Id = id;
+            _messageQueue = new Queue<string>();
             _realtimeNotiService = realtimeNotiService;
         }
 
         public Task LogAsync(string message)
         {
-            return _realtimeNotiService.NotifyLogAsync(Id, message);
+            InitTimerIfNotAlready();
+            Console.WriteLine(message);
+            _messageQueue.Enqueue(message);
+            return Task.CompletedTask;
+        }
+
+        private void InitTimerIfNotAlready()
+        {
+            lock (this)
+            {
+                if (_timer == null)
+                {
+                    _timer = new System.Timers.Timer()
+                    {
+                        AutoReset = false,
+                        Interval = 3000
+                    };
+                    _timer.Elapsed += async (obj, e) =>
+                    {
+                        _timer.Stop();
+
+                        while (_messageQueue.TryDequeue(out string message))
+                        {
+                            await _realtimeNotiService.NotifyLogAsync(Id, message);
+                        }
+
+                        _timer.Start();
+                    };
+                    _timer.Start();
+                }
+            }
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposedValue)
+            {
+                if (disposing)
+                {
+                }
+
+                _timer?.Stop();
+                _timer?.Dispose();
+
+                _disposedValue = true;
+            }
+        }
+
+        ~ApplicationLog()
+        {
+            Dispose(disposing: false);
+        }
+
+        public void Dispose()
+        {
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
         }
     }
 }

@@ -24,4 +24,9 @@ export class ProductService {
     const url = parseUrl('/api/products', dynamicUrls.saleApiUrl);
     return this._httpClient.put(url.toString(), product);
   }
+
+  createProduct(product: Partial<ProductModel>) {
+    const url = parseUrl('/api/products', dynamicUrls.saleApiUrl);
+    return this._httpClient.post<ProductModel>(url.toString(), product);
+  }
 }

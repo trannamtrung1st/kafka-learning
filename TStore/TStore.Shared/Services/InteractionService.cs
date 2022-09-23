@@ -29,13 +29,13 @@ namespace TStore.Shared.Services
 
         private readonly IInteractionRepository _interactionRepository;
         private readonly IInteractionReportRepository _interactionReportRepository;
-        private readonly ITransactionalMessagePublisher _messagePublisher;
+        private readonly IMessagePublisher _messagePublisher;
         private readonly IRealtimeNotiService _realtimeNotiService;
         private readonly IApplicationLog _log;
 
         public InteractionService(IInteractionRepository interactionRepository,
             IInteractionReportRepository interactionReportRepository,
-            ITransactionalMessagePublisher messagePublisher,
+            IMessagePublisher messagePublisher,
             IRealtimeNotiService realtimeNotiService,
             IApplicationLog log)
         {

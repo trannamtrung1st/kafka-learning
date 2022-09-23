@@ -23,6 +23,26 @@
       </ng-template>
     </nz-col>
   </nz-row>
+  <nz-card class="ts-operation">
+    <nz-space>
+      <button
+        *nzSpaceItem
+        nz-button
+        nzType="default"
+        (click)="clearSelection()"
+      >
+        Clear selection(s)
+      </button>
+      <button *nzSpaceItem nz-button nzType="primary" (click)="createProduct()">
+        Create New
+      </button>
+      <ng-container *ngIf="selectedProducts.length">
+        <button *nzSpaceItem nz-button nzType="primary" (click)="submitOrder()">
+          Submit Order
+        </button>
+      </ng-container>
+    </nz-space>
+  </nz-card>
   <nz-table #nzTable [nzData]="products || []" nzTableLayout="fixed">
     <thead>
       <tr>
@@ -48,21 +68,4 @@
       </tr>
     </tbody>
   </nz-table>
-  <nz-card class="ts-operation">
-    <nz-space>
-      <button
-        *nzSpaceItem
-        nz-button
-        nzType="default"
-        (click)="clearSelection()"
-      >
-        Clear selection(s)
-      </button>
-      <ng-container *ngIf="selectedProducts.length">
-        <button *nzSpaceItem nz-button nzType="primary" (click)="submitOrder()">
-          Submit Order
-        </button>
-      </ng-container>
-    </nz-space>
-  </nz-card>
 </nz-spin>

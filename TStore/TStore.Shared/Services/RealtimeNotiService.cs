@@ -13,10 +13,11 @@ namespace TStore.Shared.Services
         Task NotifyLogAsync(string id, string logLine);
     }
 
-    public class RealtimeNotiService : IRealtimeNotiService
+    public class RealtimeNotiService : IRealtimeNotiService, IDisposable
     {
         private readonly string _realtimeApiUrl;
         private HubConnection _connection;
+        private bool _disposedValue;
 
         public RealtimeNotiService(IConfiguration configuration)
         {
@@ -32,8 +33,6 @@ namespace TStore.Shared.Services
 
         public Task NotifyLogAsync(string id, string logLine)
         {
-            Console.WriteLine(logLine);
-
             NotificationModel noti = new NotificationModel
             {
                 Data = new LogData { Id = id, LogLine = logLine },
@@ -61,11 +60,38 @@ namespace TStore.Shared.Services
                                 return handler;
                             };
                         })
+                        .WithAutomaticReconnect()
                         .Build();
 
                     _connection.StartAsync().Wait();
                 }
             }
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposedValue)
+            {
+                if (disposing)
+                {
+                }
+
+                _connection?.StopAsync().Wait();
+                _connection?.DisposeAsync().Wait();
+
+                _disposedValue = true;
+            }
+        }
+
+        ~RealtimeNotiService()
+        {
+            Dispose(disposing: false);
+        }
+
+        public void Dispose()
+        {
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
         }
     }
 }

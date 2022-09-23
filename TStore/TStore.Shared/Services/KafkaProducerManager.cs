@@ -17,11 +17,18 @@ namespace TStore.Shared.Services
         IProducer<TKey, TValue> GetCommonProducer<TKey, TValue>(
             string eventName,
             AppProducerConfig config);
-        TransactionalProducerWrapper<TKey, TValue> GetTransactionalProducerFromPool<TKey, TValue>(
+        Task<TransactionalProducerWrapper<TKey, TValue>> GetTransactionalProducerFromPoolAsync<TKey, TValue>(
             AppProducerConfig config,
             int poolSize,
             string transactionName,
-            string transactionSuffix);
+            string transactionSuffix,
+            TimeSpan? lockTimeout = null);
+        Task<TransactionalProducerWrapper<TKey, TValue>> GetTransactionalProducerFromPoolAsync<TKey, TValue>(
+            AppProducerConfig config,
+            int poolSize,
+            string transactionName,
+            int poolId,
+            TimeSpan? lockTimeout = null);
         void Release<TKey, TValue>(TransactionalProducerWrapper<TKey, TValue> producer);
     }
 
@@ -66,18 +73,35 @@ namespace TStore.Shared.Services
             return producer;
         }
 
-        public TransactionalProducerWrapper<TKey, TValue> GetTransactionalProducerFromPool<TKey, TValue>(
+        public Task<TransactionalProducerWrapper<TKey, TValue>> GetTransactionalProducerFromPoolAsync<TKey, TValue>(
             AppProducerConfig config,
             int poolSize,
             string transactionName,
-            string transactionSuffix)
+            string transactionSuffix,
+            TimeSpan? lockTimeout = null)
         {
             if (poolSize == 0)
             {
                 throw new ArgumentException("Invalid pool size");
             }
 
-            TransactionalProducerWrapper<TKey, TValue> producerWrapper = null;
+            int poolId = HashToGetPoolId(poolSize, transactionSuffix);
+
+            return GetTransactionalProducerFromPoolAsync<TKey, TValue>(config, poolSize, transactionName, poolId, lockTimeout);
+        }
+
+        public async Task<TransactionalProducerWrapper<TKey, TValue>> GetTransactionalProducerFromPoolAsync<TKey, TValue>(
+            AppProducerConfig config,
+            int poolSize,
+            string transactionName,
+            int poolId,
+            TimeSpan? lockTimeout = null)
+        {
+            if (poolSize == 0)
+            {
+                throw new ArgumentException("Invalid pool size");
+            }
+
             bool existedBefore = true;
             ProducerPool producerPool;
 
@@ -94,25 +118,26 @@ namespace TStore.Shared.Services
             {
                 lock (producerPool)
                 {
-                    producerWrapper = producerPool.InitProducers<TKey, TValue>(config, transactionName, transactionSuffix);
+                    producerPool.InitializePool<TKey, TValue>(config, transactionName);
                 }
             }
 
-            if (producerWrapper == null)
-            {
-                producerWrapper = producerPool.GetProducer<TKey, TValue>(transactionSuffix);
-            }
+            TransactionalProducerWrapper<TKey, TValue> producerWrapper = producerPool.GetProducer<TKey, TValue>(poolId);
 
             if (producerWrapper.LastLock != null && DateTime.UtcNow - producerWrapper.LastLock > TimeSpan.FromSeconds(30))
             {
                 producerWrapper.Unlock();
             }
 
-            producerWrapper.Lock();
+            producerWrapper.Lock(lockTimeout);
 
             if (!producerWrapper.Initialized)
             {
-                producerWrapper.Initialize();
+                await producerWrapper.TryRunAsync(() =>
+                {
+                    producerWrapper.Initialize();
+                    return Task.CompletedTask;
+                });
             }
 
             return producerWrapper;
@@ -125,6 +150,8 @@ namespace TStore.Shared.Services
                 producerWrapper.Unlock();
             }
         }
+
+        private int HashToGetPoolId(int poolSize, string suffix) => Math.Abs(suffix.GetHashCode()) % poolSize;
 
         protected virtual void Dispose(bool disposing)
         {
@@ -165,6 +192,7 @@ namespace TStore.Shared.Services
     internal class ProducerPool : ConcurrentDictionary<int, IDisposable>, IDisposable
     {
         private bool _disposedValue;
+        private Func<int, IDisposable> _createProducerFunc;
 
         public int PoolSize { get; }
 
@@ -173,37 +201,25 @@ namespace TStore.Shared.Services
             PoolSize = poolSize;
         }
 
-        public TransactionalProducerWrapper<TKey, TValue> GetProducer<TKey, TValue>(string transactionSuffix)
+        public TransactionalProducerWrapper<TKey, TValue> GetProducer<TKey, TValue>(int poolId)
         {
-            int poolId = GetPoolId(PoolSize, transactionSuffix);
-
-            TransactionalProducerWrapper<TKey, TValue> producerWrapper = this[poolId] as TransactionalProducerWrapper<TKey, TValue>;
+            TransactionalProducerWrapper<TKey, TValue> producerWrapper
+                = GetOrAdd(poolId, (_) => _createProducerFunc(poolId)) as TransactionalProducerWrapper<TKey, TValue>;
 
             return producerWrapper;
         }
 
-        public TransactionalProducerWrapper<TKey, TValue> InitProducers<TKey, TValue>(
+        public void InitializePool<TKey, TValue>(
             AppProducerConfig config,
-            string transactionName,
-            string transactionSuffix)
+            string transactionName)
         {
-            int currentPoolId = GetPoolId(PoolSize, transactionSuffix);
-
-            TransactionalProducerWrapper<TKey, TValue> producerWrapper =
-                CreateProducerAndAddToPool<TKey, TValue>(config, currentPoolId, transactionName);
-
-            Task.Run(() =>
+            _createProducerFunc = (poolId) =>
             {
-                for (int id = 0; id < PoolSize; id++)
-                {
-                    if (id != currentPoolId)
-                    {
-                        CreateProducerAndAddToPool<TKey, TValue>(config, id, transactionName);
-                    }
-                }
-            });
+                TransactionalProducerWrapper<TKey, TValue> producerWrapper =
+                    CreateProducerAndAddToPool<TKey, TValue>(config, poolId, transactionName);
 
-            return producerWrapper;
+                return producerWrapper;
+            };
         }
 
         private TransactionalProducerWrapper<TKey, TValue> CreateProducerAndAddToPool<TKey, TValue>(
@@ -219,8 +235,6 @@ namespace TStore.Shared.Services
 
         private string GetFinalTransactionId(string transactionName, int poolId)
             => $"{transactionName}_{poolId}";
-
-        private int GetPoolId(int poolSize, string suffix) => Math.Abs(suffix.GetHashCode()) % poolSize;
 
         protected virtual void Dispose(bool disposing)
         {
@@ -275,7 +289,7 @@ namespace TStore.Shared.Services
             _asyncPolicy = BuildProduceExceptionRetryPolicy();
         }
 
-        public Task WrapTransactionAsync(Func<Task> action)
+        public Task TryRunAsync(Func<Task> action)
         {
             return _asyncPolicy.ExecuteAsync(action);
         }
@@ -320,11 +334,15 @@ namespace TStore.Shared.Services
             LastLock = null;
 
             _semaphoreSlim.Release();
+
+            Console.WriteLine($"Unlocked producer {TransactionalId}");
         }
 
         public void Lock(TimeSpan? timeout = null)
         {
             bool lockWasTaken = _semaphoreSlim.Wait(timeout ?? TimeSpan.FromSeconds(7));
+
+            Console.WriteLine($"Locked producer {TransactionalId}");
 
             if (lockWasTaken)
             {
@@ -357,18 +375,15 @@ namespace TStore.Shared.Services
             var jitterDelay = Backoff.DecorrelatedJitterBackoffV2(medianFirstRetryDelay: TimeSpan.FromSeconds(2), retryCount: 2);
 
             AsyncRetryPolicy produceRetry = Policy
-                .Handle<ProduceException<TKey, TValue>>(ex => ex.Error.IsLocalError)
-                .Or<KafkaException>(ex => ex.Error.Code == ErrorCode.InvalidProducerIdMapping)
+                .Handle<KafkaException>()
                 .WaitAndRetryAsync(jitterDelay, onRetry: (exception, delay, count, context) =>
                 {
-                    if (count == 1)
-                    {
-                        Console.WriteLine("Re-initializing");
-                        _producer.Dispose();
-                        _producer = CreateNewTransactionalProducer();
-                        Initialize();
-                        Console.WriteLine("Re-initialized");
-                    }
+                    Console.WriteLine(exception);
+                    Console.WriteLine("Re-initializing");
+                    _producer.Dispose();
+                    _producer = CreateNewTransactionalProducer();
+                    Initialize();
+                    Console.WriteLine("Re-initialized");
                 });
 
             return produceRetry;

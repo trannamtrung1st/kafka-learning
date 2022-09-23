@@ -7,18 +7,18 @@ using TStore.Shared.Helpers;
 
 namespace TStore.Shared.Services
 {
-    public interface ITransactionalMessagePublisher
+    public interface IMessagePublisher
     {
         Task PublishAsync<TKey, TValue>(string eventName, TKey key, TValue value, Action<object> deliveryHandler = null);
         Task<object> PublishAndWaitAsync<TKey, TValue>(string eventName, TKey key, TValue value);
     }
 
-    public class KafkaCommonMessagePublisher : ITransactionalMessagePublisher
+    public class KafkaMessagePublisher : IMessagePublisher
     {
         private readonly AppProducerConfig _baseConfig;
         private readonly IKafkaProducerManager _kafkaProducerManager;
 
-        public KafkaCommonMessagePublisher(IConfiguration configuration,
+        public KafkaMessagePublisher(IConfiguration configuration,
             IKafkaProducerManager kafkaProducerManager)
         {
             _kafkaProducerManager = kafkaProducerManager;

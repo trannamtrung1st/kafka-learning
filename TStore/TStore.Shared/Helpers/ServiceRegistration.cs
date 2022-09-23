@@ -26,7 +26,7 @@ namespace TStore.Shared.Helpers
 
             services.AddSingleton<IKafkaProducerManager, KafkaProducerManager>();
 
-            services.AddSingleton<ITransactionalMessagePublisher, KafkaCommonMessagePublisher>();
+            services.AddSingleton<IMessagePublisher, KafkaMessagePublisher>();
 
             services.AddSingleton<IApplicationLog>(p =>
             {
@@ -52,7 +52,7 @@ namespace TStore.Shared.Helpers
 
             services.AddSingleton<IKafkaProducerManager, KafkaProducerManager>();
 
-            services.AddSingleton<ITransactionalMessagePublisher, KafkaCommonMessagePublisher>();
+            services.AddSingleton<IMessagePublisher, KafkaMessagePublisher>();
 
             services.AddSingleton<IApplicationLog>(p =>
             {

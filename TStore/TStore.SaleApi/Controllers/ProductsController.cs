@@ -32,5 +32,13 @@ namespace TStore.SaleApi.Controllers
 
             return NoContent();
         }
+
+        [HttpPost("")]
+        public async Task<IActionResult> CreateProduct([FromBody] ProductModel model)
+        {
+            await _productService.CreateProductAsync(model);
+
+            return Ok(model);
+        }
     }
 }

@@ -270,6 +270,7 @@ services:
     environment:
       - RealtimeApiUrl=https://host.docker.internal:8001
       - StartFromVS=false
+      # - SyncDelay=10000
       - ExternalProductSyncConsumerConfig__BootstrapServers=kafka:29093
       - ExternalProductSyncConsumerConfig__SslCaLocation=/certs/kafka-broker/ca-root.crt
       - ExternalProductSyncConsumerConfig__SslKeyPassword=123456

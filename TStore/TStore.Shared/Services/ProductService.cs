@@ -16,6 +16,7 @@ namespace TStore.Shared.Services
     {
         Task<IEnumerable<ProductModel>> GetProductsAsync(SimpleFilterModel filter);
         Task UpdateProductAsync(ProductModel model);
+        Task CreateProductAsync(ProductModel model);
     }
 
     public class ProductService : IProductService
@@ -70,10 +71,26 @@ namespace TStore.Shared.Services
             return products;
         }
 
+        public async Task CreateProductAsync(ProductModel model)
+        {
+            Entities.Product productEntity = new Entities.Product
+            {
+                Id = Guid.NewGuid(),
+                Name = model.Name,
+                Price = model.Price
+            };
+
+            model.Id = productEntity.Id;
+
+            _productRepository.Create(productEntity);
+
+            await _productRepository.UnitOfWork.SaveChangesAsync();
+
+            await PublishProductEventAsync(productEntity, model, EventConstants.Events.ProductCreated);
+        }
+
         public async Task UpdateProductAsync(ProductModel model)
         {
-            using ITransaction transaction = await _productRepository.UnitOfWork.BeginTransactionAsync();
-
             Entities.Product productEntity = new Entities.Product
             {
                 Id = model.Id,
@@ -85,60 +102,67 @@ namespace TStore.Shared.Services
 
             await _productRepository.UnitOfWork.SaveChangesAsync();
 
-            await PublishProductUpdatedAsync(productEntity, model);
-
-            await transaction.CommitAsync();
+            await PublishProductEventAsync(productEntity, model, EventConstants.Events.ProductUpdated);
         }
 
-        private async Task PublishProductUpdatedAsync(Entities.Product productEntity, ProductModel model)
+        private async Task PublishProductEventAsync(Entities.Product productEntity, ProductModel model, string eventName)
         {
             // [Important] 1 TransactionalId per producer instance
-            TransactionalProducerWrapper<string, object> producerWrapper = _kafkaProducerManager
-                .GetTransactionalProducerFromPool<string, object>(
+            TransactionalProducerWrapper<string, object> producerWrapper = await _kafkaProducerManager
+                .GetTransactionalProducerFromPoolAsync<string, object>(
                     _baseConfig,
                     _baseConfig.DefaultPoolSize,
-                    nameof(PublishProductUpdatedAsync),
-                    $"_{productEntity.Id}");
+                    nameof(PublishProductEventAsync),
+                    $"_{productEntity.Id}",
+                    TimeSpan.FromSeconds(30));
 
-            // [DEMO] heavy producer transaction
-            if (_productUpdatedDelay > 0)
+            try
             {
-                await Task.Delay(_productUpdatedDelay.Value);
+                // [DEMO] heavy producer transaction
+                if (_productUpdatedDelay > 0)
+                {
+                    await Task.Delay(_productUpdatedDelay.Value);
+                }
+
+                await producerWrapper.TryRunAsync(async () =>
+                {
+                    producerWrapper.BeginTransaction();
+
+                    await _log.LogAsync($"Entered transaction {producerWrapper.TransactionalId}");
+
+                    try
+                    {
+                        await _log.LogAsync($"Producing message {productEntity.Id} in {producerWrapper.TransactionalId}");
+
+                        await producerWrapper.ProduceAsync(eventName,
+                            new Confluent.Kafka.Message<string, object>
+                            {
+                                Key = productEntity.Id.ToString(),
+                                Value = model
+                            });
+
+                        await _log.LogAsync($"Committing transaction {producerWrapper.TransactionalId}");
+
+                        producerWrapper.CommitTransaction();
+
+                        await _log.LogAsync($"Committed transaction {producerWrapper.TransactionalId}");
+                    }
+                    catch (Exception ex)
+                    {
+                        await _log.LogAsync(ex.ToString());
+
+                        producerWrapper.AbortTransaction();
+
+                        await _log.LogAsync($"Aborted transaction {producerWrapper.TransactionalId}");
+
+                        throw ex;
+                    }
+                });
             }
-
-            await producerWrapper.WrapTransactionAsync(async () =>
+            finally
             {
-                producerWrapper.BeginTransaction();
-
-                await _log.LogAsync($"Enter transaction {producerWrapper.TransactionalId}");
-
-                try
-                {
-                    await producerWrapper.ProduceAsync(
-                        EventConstants.Events.ProductUpdated,
-                        new Confluent.Kafka.Message<string, object>
-                        {
-                            Key = productEntity.Id.ToString(),
-                            Value = model
-                        });
-
-                    producerWrapper.CommitTransaction();
-
-                    await _log.LogAsync($"Commit transaction {producerWrapper.TransactionalId}");
-                }
-                catch (Exception ex)
-                {
-                    await _log.LogAsync(ex.ToString());
-
-                    producerWrapper.AbortTransaction();
-
-                    await _log.LogAsync($"Abort transaction {producerWrapper.TransactionalId}");
-
-                    throw ex;
-                }
-            });
-
-            _kafkaProducerManager.Release(producerWrapper);
+                _kafkaProducerManager.Release(producerWrapper);
+            }
         }
     }
 }

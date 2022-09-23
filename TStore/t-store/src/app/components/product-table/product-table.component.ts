@@ -21,7 +21,8 @@ export class ProductTableComponent implements OnInit {
   selectedProducts: ProductModel[];
   loading: boolean;
   products?: ProductModel[];
-  originalProducts?: ProductModel[];
+
+  private _originalProducts?: ProductModel[];
 
   constructor(private _productService: ProductService,
     private _interactionService: InteractionService,
@@ -36,19 +37,7 @@ export class ProductTableComponent implements OnInit {
 
   ngOnInit(): void {
     this.loading = true;
-    const finishFetching = () => this.loading = false;
-    this._productService.getProducts({}).subscribe({
-      next: products => {
-        this.originalProducts = products;
-        this.products = products;
-        this.productSelections = products.map(_ => false);
-      },
-      error: () => {
-        this._messageService.error('Error fetching products');
-        finishFetching();
-      },
-      complete: () => finishFetching()
-    });
+    this._fetchProducts();
   }
 
   reset(): void {
@@ -57,7 +46,7 @@ export class ProductTableComponent implements OnInit {
   }
 
   search(): void {
-    const filteredProducts = (this.originalProducts || [])
+    const filteredProducts = (this._originalProducts || [])
       .filter((item: ProductModel) => item.name.indexOf(this.searchValue) !== -1);
     this.productSelections = filteredProducts.map(_ => false);
     this.products = filteredProducts;
@@ -77,6 +66,17 @@ export class ProductTableComponent implements OnInit {
     this._submitCreateOrder(this.selectedProducts);
   }
 
+  createProduct() {
+    const name = prompt(`Enter a product name: `)?.trim();
+    const price = Number.parseFloat(prompt(`Enter price: `) || '');
+    if (!name || isNaN(price)) {
+      this._messageService.error('Invalid product data');
+    } else {
+      const newProduct: Partial<ProductModel> = { name, price };
+      this._submitCreateProduct(newProduct);
+    }
+  }
+
   openProductUpdate(product: ProductModel) {
     const newName = prompt(`Enter a new name (${product.name}): `)?.trim();
     const newPrice = Number.parseFloat(prompt(`Enter a new price (${product.price}): `) || '');
@@ -92,6 +92,22 @@ export class ProductTableComponent implements OnInit {
     this.selectedProducts = this.products?.filter((item, idx) => this.productSelections[idx]) || [];
   }
 
+  private _fetchProducts() {
+    const finishFetching = () => this.loading = false;
+    this._productService.getProducts({}).subscribe({
+      next: products => {
+        this._originalProducts = products;
+        this.products = products;
+        this.productSelections = products.map(_ => false);
+      },
+      error: () => {
+        this._messageService.error('Error fetching products');
+        finishFetching();
+      },
+      complete: () => finishFetching()
+    });
+  }
+
   private _submitUpdateProduct(updatedProduct: ProductModel) {
     this.loading = true;
 
@@ -99,7 +115,7 @@ export class ProductTableComponent implements OnInit {
 
     this._productService.updateProduct(updatedProduct).subscribe({
       next: () => {
-        const product = this.originalProducts?.find(p => p.id === updatedProduct.id);
+        const product = this._originalProducts?.find(p => p.id === updatedProduct.id);
         if (product) {
           Object.assign(product, updatedProduct);
         }
@@ -108,6 +124,26 @@ export class ProductTableComponent implements OnInit {
       },
       error: (err) => {
         this._messageService.error('Failed to update product');
+        submitFinish();
+      },
+      complete: () => submitFinish()
+    });
+  }
+
+  private _submitCreateProduct(newProduct: Partial<ProductModel>) {
+    this.loading = true;
+
+    const submitFinish = () => this.loading = false;
+
+    this._productService.createProduct(newProduct).subscribe({
+      next: (createdProduct) => {
+        this._originalProducts?.push(createdProduct);
+        this.reset();
+        this._fetchProducts();
+        this._messageService.success('Created product successfully');
+      },
+      error: (err) => {
+        this._messageService.error('Failed to create product');
         submitFinish();
       },
       complete: () => submitFinish()
