@@ -89,6 +89,7 @@ namespace TStore.Consumers.ExternalProductSync
                     try
                     {
                         bool inTransaction = false;
+                        System.Timers.Timer commitTimer = null;
 
                         Func<Task> abortTransFunc = async () =>
                         {
@@ -103,6 +104,11 @@ namespace TStore.Consumers.ExternalProductSync
                             catch (Exception ex)
                             {
                                 Console.Error.WriteLine(ex);
+                            }
+                            finally
+                            {
+                                commitTimer?.Stop();
+                                commitTimer?.Dispose();
                             }
                         };
 
@@ -126,7 +132,7 @@ namespace TStore.Consumers.ExternalProductSync
 
                                 await _log.LogAsync($"Entered transaction {producerWrapper.TransactionalId}");
 
-                                System.Timers.Timer commitTimer = new System.Timers.Timer()
+                                commitTimer = new System.Timers.Timer()
                                 {
                                     AutoReset = false,
                                     Interval = _transactionCommitInterval
@@ -150,8 +156,6 @@ namespace TStore.Consumers.ExternalProductSync
                                     }
                                     finally
                                     {
-                                        commitTimer.Stop();
-                                        commitTimer.Dispose();
                                         semaphore.Release();
                                     }
                                 };
