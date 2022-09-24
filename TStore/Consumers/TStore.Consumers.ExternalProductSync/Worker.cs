@@ -23,6 +23,7 @@ namespace TStore.Consumers.ExternalProductSync
         private readonly AppConsumerConfig _baseConsumerConfig;
         private readonly AppProducerConfig _baseProducerConfig;
         private readonly int _transactionCommitInterval;
+        private bool _cancelled;
 
         public Worker(IServiceProvider serviceProvider, IConfiguration configuration,
             IApplicationLog log)
@@ -48,42 +49,61 @@ namespace TStore.Consumers.ExternalProductSync
         {
             Thread thread = new Thread(async () =>
             {
-                IKafkaProducerManager kafkaProducerManager = _serviceProvider.GetService<IKafkaProducerManager>();
-                SemaphoreSlim semaphore = new SemaphoreSlim(1, 1);
-
-                // [Important] 1 TransactionalId per producer instance
-                TransactionalProducerWrapper<string, string> producerWrapper = null;
-
-                try
+                while (!_cancelled)
                 {
-                    producerWrapper = await kafkaProducerManager
-                        .GetTransactionalProducerFromPoolAsync<string, string>(
-                            _baseProducerConfig, _baseProducerConfig.DefaultPoolSize,
-                            nameof(ExternalProductSync), idx);
-
-                    using (IConsumer<string, ProductModel> consumer
-                        = new ConsumerBuilder<string, ProductModel>(_baseConsumerConfig)
-                            .SetValueDeserializer(new SimpleJsonSerdes<ProductModel>())
-                            .Build())
+                    try
                     {
-                        bool cancelled = false;
+                        await ConsumeAsync(idx);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine(ex);
+                        await Task.Delay(7000);
+                    }
+                }
+            });
+            thread.IsBackground = true;
+            thread.Start();
+        }
+
+        private async Task ConsumeAsync(int idx)
+        {
+            IKafkaProducerManager kafkaProducerManager = _serviceProvider.GetService<IKafkaProducerManager>();
+            SemaphoreSlim semaphore = new SemaphoreSlim(1, 1);
+
+            // [Important] 1 TransactionalId per producer instance
+            TransactionalProducerWrapper<string, string> producerWrapper = null;
+
+            try
+            {
+                producerWrapper = await kafkaProducerManager
+                    .GetTransactionalProducerFromPoolAsync<string, string>(
+                        _baseProducerConfig, _baseProducerConfig.DefaultPoolSize,
+                        nameof(ExternalProductSync), idx, forceRecreate: true);
+
+                using (IConsumer<string, ProductModel> consumer
+                    = new ConsumerBuilder<string, ProductModel>(_baseConsumerConfig)
+                        .SetValueDeserializer(new SimpleJsonSerdes<ProductModel>())
+                        .Build())
+                {
+                    try
+                    {
                         bool inTransaction = false;
 
                         Func<Task> abortTransFunc = async () =>
                         {
-                            producerWrapper.AbortTransaction();
-
-                            inTransaction = false;
-
-                            // [DEMO] re-subscribe
-                            consumer.Unsubscribe();
-                            consumer.Subscribe(new[]
+                            try
                             {
-                                EventConstants.Events.ProductCreated,
-                                EventConstants.Events.ProductUpdated
-                            });
+                                producerWrapper.AbortTransaction();
 
-                            await _log.LogAsync($"Aborted transaction {producerWrapper.TransactionalId}");
+                                inTransaction = false;
+
+                                await _log.LogAsync($"Aborted transaction {producerWrapper.TransactionalId}");
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.Error.WriteLine(ex);
+                            }
                         };
 
                         consumer.Subscribe(new[]
@@ -92,114 +112,104 @@ namespace TStore.Consumers.ExternalProductSync
                             EventConstants.Events.ProductUpdated
                         });
 
-                        while (!cancelled)
+                        while (!_cancelled)
                         {
                             ConsumeResult<string, ProductModel> message = consumer.Consume(default(CancellationToken));
 
-                            try
+                            await semaphore.WaitAsync();
+
+                            if (!inTransaction)
                             {
-                                await semaphore.WaitAsync();
+                                producerWrapper.BeginTransaction();
 
-                                if (!inTransaction)
+                                inTransaction = true;
+
+                                await _log.LogAsync($"Entered transaction {producerWrapper.TransactionalId}");
+
+                                System.Timers.Timer commitTimer = new System.Timers.Timer()
                                 {
-                                    producerWrapper.BeginTransaction();
-
-                                    inTransaction = true;
-
-                                    await _log.LogAsync($"Entered transaction {producerWrapper.TransactionalId}");
-
-                                    System.Timers.Timer commitTimer = new System.Timers.Timer()
-                                    {
-                                        AutoReset = false,
-                                        Interval = _transactionCommitInterval
-                                    };
-                                    commitTimer.Elapsed += async (obj, e) =>
-                                    {
-                                        try
-                                        {
-                                            await semaphore.WaitAsync();
-
-                                            producerWrapper.CommitTransaction();
-
-                                            inTransaction = false;
-
-                                            await _log.LogAsync($"Committed transaction {producerWrapper.TransactionalId}");
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            await abortTransFunc();
-                                            throw ex;
-                                        }
-                                        finally
-                                        {
-                                            commitTimer.Stop();
-                                            commitTimer.Dispose();
-                                            semaphore.Release();
-                                        }
-                                    };
-                                    commitTimer.Start();
-                                }
-
-                                await producerWrapper.TryRunAsync(async () =>
+                                    AutoReset = false,
+                                    Interval = _transactionCommitInterval
+                                };
+                                commitTimer.Elapsed += async (obj, e) =>
                                 {
-                                    // [DEMO] heavy task
-                                    int? syncDelay = _configuration.GetValue<int?>("SyncDelay");
-                                    if (syncDelay > 0)
-                                    {
-                                        await Task.Delay(syncDelay.Value);
-                                    }
-
                                     try
                                     {
-                                        await _log.LogAsync($"Consumer {idx} begins to transform product {JsonConvert.SerializeObject(message.Message.Value)}");
+                                        await semaphore.WaitAsync();
 
-                                        for (int i = 0; i < 10; i++)
-                                        {
-                                            await producerWrapper.ProduceAsync(EventConstants.Events.SampleEvents,
-                                                new Message<string, string>
-                                                {
-                                                    Key = message.Message.Key,
-                                                    Value = $"Sample value {i}"
-                                                });
-                                        }
+                                        producerWrapper.CommitTransaction();
 
-                                        producerWrapper.SendOffsetsToTransaction(
-                                            new[] { message.TopicPartitionOffset },
-                                            consumer.ConsumerGroupMetadata,
-                                            TimeSpan.FromSeconds(30));
+                                        inTransaction = false;
 
-                                        await _log.LogAsync($"Consumer {idx} finishes processing product {message.Message.Value.Id}");
+                                        await _log.LogAsync($"Committed transaction {producerWrapper.TransactionalId}");
                                     }
                                     catch (Exception ex)
                                     {
+                                        Console.Error.WriteLine(ex);
                                         await abortTransFunc();
-                                        throw ex;
                                     }
-                                });
+                                    finally
+                                    {
+                                        commitTimer.Stop();
+                                        commitTimer.Dispose();
+                                        semaphore.Release();
+                                    }
+                                };
+                                commitTimer.Start();
+                            }
+
+                            // [DEMO] heavy task
+                            int? syncDelay = _configuration.GetValue<int?>("SyncDelay");
+                            if (syncDelay > 0)
+                            {
+                                await Task.Delay(syncDelay.Value);
+                            }
+
+                            try
+                            {
+                                await _log.LogAsync($"Consumer {idx} begins to transform product {JsonConvert.SerializeObject(message.Message.Value)}");
+
+                                for (int i = 0; i < 10; i++)
+                                {
+                                    await producerWrapper.ProduceAsync(EventConstants.Events.SampleEvents,
+                                        new Message<string, string>
+                                        {
+                                            Key = message.Message.Key,
+                                            Value = $"Sample value {i}"
+                                        });
+                                }
+
+                                producerWrapper.SendOffsetsToTransaction(
+                                    new[] { message.TopicPartitionOffset },
+                                    consumer.ConsumerGroupMetadata,
+                                    TimeSpan.FromSeconds(30));
+
+                                await _log.LogAsync($"Consumer {idx} finishes processing product {message.Message.Value.Id}");
+                            }
+                            catch (Exception ex)
+                            {
+                                await abortTransFunc();
+                                throw ex;
                             }
                             finally
                             {
                                 semaphore.Release();
                             }
                         }
-
+                    }
+                    finally
+                    {
                         consumer.Close();
                     }
                 }
-                catch (Exception ex)
+            }
+            finally
+            {
+                if (producerWrapper != null)
                 {
-                    Console.Error.WriteLine(ex);
+                    kafkaProducerManager.Release(producerWrapper);
                 }
-                finally
-                {
-                    if (producerWrapper != null)
-                    {
-                        kafkaProducerManager.Release(producerWrapper);
-                    }
-                }
-            });
-            thread.IsBackground = true;
-            thread.Start();
+            }
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)

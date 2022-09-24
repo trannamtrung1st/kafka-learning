@@ -22,6 +22,7 @@ namespace TStore.Consumers.InteractionAggregator
         private readonly IServiceProvider _serviceProvider;
         private readonly IApplicationLog _log;
         private readonly AppConsumerConfig _baseConfig;
+        private bool _cancelled;
 
         public Worker(IServiceProvider serviceProvider, IConfiguration configuration,
             IApplicationLog log)
@@ -42,48 +43,60 @@ namespace TStore.Consumers.InteractionAggregator
         {
             Thread thread = new Thread(async () =>
             {
-                try
+                while (!_cancelled)
                 {
-                    bool cancelled = false;
-
-                    using (IConsumer<string, IEnumerable<InteractionModel>> consumer
-                        = new ConsumerBuilder<string, IEnumerable<InteractionModel>>(_baseConfig)
-                            .SetValueDeserializer(new SimpleJsonSerdes<IEnumerable<InteractionModel>>())
-                            .Build())
+                    try
                     {
-                        consumer.Subscribe(EventConstants.Events.NewRecordedInteraction);
-
-                        while (!cancelled)
-                        {
-                            ConsumeResult<string, IEnumerable<InteractionModel>> message = consumer.Consume(default(CancellationToken));
-
-                            await _log.LogAsync($"Consumer {idx} begins handle message {message.Message.Timestamp.UtcDateTime}");
-
-                            using (IServiceScope scope = _serviceProvider.CreateScope())
-                            {
-                                await HandleNewInteractionsAsync(message.Message.Value);
-                            }
-
-                            try
-                            {
-                                consumer.Commit();
-                            }
-                            catch (Exception ex)
-                            {
-                                await _log.LogAsync(ex.Message);
-                            }
-                        }
-
-                        consumer.Close();
+                        await ConsumeAsync(idx);
                     }
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine(ex);
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine(ex);
+                        await Task.Delay(7000);
+                    }
                 }
             });
             thread.IsBackground = true;
             thread.Start();
+        }
+
+        private async Task ConsumeAsync(int idx)
+        {
+            using (IConsumer<string, IEnumerable<InteractionModel>> consumer
+                    = new ConsumerBuilder<string, IEnumerable<InteractionModel>>(_baseConfig)
+                        .SetValueDeserializer(new SimpleJsonSerdes<IEnumerable<InteractionModel>>())
+                        .Build())
+            {
+                try
+                {
+                    consumer.Subscribe(EventConstants.Events.NewRecordedInteraction);
+
+                    while (!_cancelled)
+                    {
+                        ConsumeResult<string, IEnumerable<InteractionModel>> message = consumer.Consume(default(CancellationToken));
+
+                        await _log.LogAsync($"Consumer {idx} begins handle message {message.Message.Timestamp.UtcDateTime}");
+
+                        using (IServiceScope scope = _serviceProvider.CreateScope())
+                        {
+                            await HandleNewInteractionsAsync(message.Message.Value);
+                        }
+
+                        try
+                        {
+                            consumer.Commit();
+                        }
+                        catch (Exception ex)
+                        {
+                            await _log.LogAsync(ex.Message);
+                        }
+                    }
+                }
+                finally
+                {
+                    consumer.Close();
+                }
+            }
         }
 
         private async Task HandleNewInteractionsAsync(IEnumerable<InteractionModel> interactionModels)

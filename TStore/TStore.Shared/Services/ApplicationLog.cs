@@ -47,14 +47,25 @@ namespace TStore.Shared.Services
                     };
                     _timer.Elapsed += async (obj, e) =>
                     {
-                        _timer.Stop();
-
-                        while (_messageQueue.TryDequeue(out string message))
+                        try
                         {
-                            await _realtimeNotiService.NotifyLogAsync(Id, message);
-                        }
+                            _timer.Stop();
 
-                        _timer.Start();
+                            while (_messageQueue.TryDequeue(out string message))
+                            {
+                                await _realtimeNotiService.NotifyLogAsync(Id, message);
+                            }
+
+                            _timer.Start();
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.Error.WriteLine(ex);
+                        }
+                        finally
+                        {
+                            _timer.Start();
+                        }
                     };
                     _timer.Start();
                 }

@@ -22,13 +22,15 @@ namespace TStore.Shared.Services
             int poolSize,
             string transactionName,
             string transactionSuffix,
-            TimeSpan? lockTimeout = null);
+            TimeSpan? lockTimeout = null,
+            bool forceRecreate = false);
         Task<TransactionalProducerWrapper<TKey, TValue>> GetTransactionalProducerFromPoolAsync<TKey, TValue>(
             AppProducerConfig config,
             int poolSize,
             string transactionName,
             int poolId,
-            TimeSpan? lockTimeout = null);
+            TimeSpan? lockTimeout = null,
+            bool forceRecreate = false);
         void Release<TKey, TValue>(TransactionalProducerWrapper<TKey, TValue> producer);
     }
 
@@ -78,7 +80,8 @@ namespace TStore.Shared.Services
             int poolSize,
             string transactionName,
             string transactionSuffix,
-            TimeSpan? lockTimeout = null)
+            TimeSpan? lockTimeout = null,
+            bool forceRecreate = false)
         {
             if (poolSize == 0)
             {
@@ -87,7 +90,7 @@ namespace TStore.Shared.Services
 
             int poolId = HashToGetPoolId(poolSize, transactionSuffix);
 
-            return GetTransactionalProducerFromPoolAsync<TKey, TValue>(config, poolSize, transactionName, poolId, lockTimeout);
+            return GetTransactionalProducerFromPoolAsync<TKey, TValue>(config, poolSize, transactionName, poolId, lockTimeout, forceRecreate);
         }
 
         public async Task<TransactionalProducerWrapper<TKey, TValue>> GetTransactionalProducerFromPoolAsync<TKey, TValue>(
@@ -95,7 +98,8 @@ namespace TStore.Shared.Services
             int poolSize,
             string transactionName,
             int poolId,
-            TimeSpan? lockTimeout = null)
+            TimeSpan? lockTimeout = null,
+            bool forceRecreate = false)
         {
             if (poolSize == 0)
             {
@@ -122,7 +126,7 @@ namespace TStore.Shared.Services
                 }
             }
 
-            TransactionalProducerWrapper<TKey, TValue> producerWrapper = producerPool.GetProducer<TKey, TValue>(poolId);
+            TransactionalProducerWrapper<TKey, TValue> producerWrapper = producerPool.GetProducer<TKey, TValue>(poolId, out bool newlyCreated);
 
             if (producerWrapper.LastLock != null && DateTime.UtcNow - producerWrapper.LastLock > TimeSpan.FromSeconds(30))
             {
@@ -130,6 +134,11 @@ namespace TStore.Shared.Services
             }
 
             producerWrapper.Lock(lockTimeout);
+
+            if (producerWrapper.Initialized && forceRecreate)
+            {
+                producerWrapper.RecreateProducer();
+            }
 
             if (!producerWrapper.Initialized)
             {
@@ -201,10 +210,18 @@ namespace TStore.Shared.Services
             PoolSize = poolSize;
         }
 
-        public TransactionalProducerWrapper<TKey, TValue> GetProducer<TKey, TValue>(int poolId)
+        public TransactionalProducerWrapper<TKey, TValue> GetProducer<TKey, TValue>(int poolId, out bool newlyCreated)
         {
+            bool isNewlyCreated = false;
+
             TransactionalProducerWrapper<TKey, TValue> producerWrapper
-                = GetOrAdd(poolId, (_) => _createProducerFunc(poolId)) as TransactionalProducerWrapper<TKey, TValue>;
+                = GetOrAdd(poolId, (_) =>
+                {
+                    isNewlyCreated = true;
+                    return _createProducerFunc(poolId);
+                }) as TransactionalProducerWrapper<TKey, TValue>;
+
+            newlyCreated = isNewlyCreated;
 
             return producerWrapper;
         }
@@ -380,8 +397,7 @@ namespace TStore.Shared.Services
                 {
                     Console.WriteLine(exception);
                     Console.WriteLine("Re-initializing");
-                    _producer.Dispose();
-                    _producer = CreateNewTransactionalProducer();
+                    RecreateProducer();
                     Initialize();
                     Console.WriteLine("Re-initialized");
                 });
@@ -389,6 +405,12 @@ namespace TStore.Shared.Services
             return produceRetry;
         }
 
+        public void RecreateProducer()
+        {
+            _producer.Dispose();
+            _producer = CreateNewTransactionalProducer();
+            LastInitialization = null;
+        }
 
         protected virtual void Dispose(bool disposing)
         {

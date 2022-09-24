@@ -70,7 +70,8 @@ namespace TStore.SystemApi.Services
                 topicSpecs.Add(new TopicSpecification
                 {
                     Name = EventConstants.Events.NewOrder,
-                    NumPartitions = 7
+                    NumPartitions = 7,
+                    ReplicationFactor = 3
                 });
             }
 
@@ -79,7 +80,8 @@ namespace TStore.SystemApi.Services
                 topicSpecs.Add(new TopicSpecification
                 {
                     Name = EventConstants.Events.PromotionApplied,
-                    NumPartitions = 7
+                    NumPartitions = 7,
+                    ReplicationFactor = 3
                 });
             }
 
@@ -88,7 +90,8 @@ namespace TStore.SystemApi.Services
                 topicSpecs.Add(new TopicSpecification
                 {
                     Name = EventConstants.Events.ShipApplied,
-                    NumPartitions = 7
+                    NumPartitions = 7,
+                    ReplicationFactor = 3
                 });
             }
 
@@ -98,7 +101,8 @@ namespace TStore.SystemApi.Services
                 {
                     Name = EventConstants.Events.ProductUpdated,
                     NumPartitions = 1,
-                    Configs = _topicsConfigs.ProductTopics
+                    Configs = _topicsConfigs.ProductTopics,
+                    ReplicationFactor = 3
                 });
             }
 
@@ -108,7 +112,8 @@ namespace TStore.SystemApi.Services
                 {
                     Name = EventConstants.Events.ProductCreated,
                     NumPartitions = 2,
-                    Configs = _topicsConfigs.ProductTopics
+                    Configs = _topicsConfigs.ProductTopics,
+                    ReplicationFactor = 3
                 });
             }
 
@@ -118,7 +123,8 @@ namespace TStore.SystemApi.Services
                 {
                     Name = EventConstants.Events.NewUnsavedInteraction,
                     NumPartitions = 7,
-                    Configs = _topicsConfigs.Interaction
+                    Configs = _topicsConfigs.Interaction,
+                    ReplicationFactor = 3
                 });
             }
 
@@ -128,7 +134,8 @@ namespace TStore.SystemApi.Services
                 {
                     Name = EventConstants.Events.NewRecordedInteraction,
                     NumPartitions = 7,
-                    Configs = _topicsConfigs.Interaction
+                    Configs = _topicsConfigs.Interaction,
+                    ReplicationFactor = 3
                 });
             }
 
@@ -137,7 +144,8 @@ namespace TStore.SystemApi.Services
                 topicSpecs.Add(new TopicSpecification
                 {
                     Name = EventConstants.Events.SampleEvents,
-                    NumPartitions = 1
+                    NumPartitions = 1,
+                    ReplicationFactor = 3
                 });
             }
 

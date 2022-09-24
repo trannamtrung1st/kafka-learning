@@ -12,7 +12,7 @@ namespace TStore.Consumers.MessageViewer
             ConsumerConfig config = new ConsumerConfig
             {
                 GroupId = "MessageViewer",
-                BootstrapServers = "localhost:9093",
+                BootstrapServers = "localhost:9093,localhost:9095,localhost:9097",
                 SslKeyPassword = "123456",
                 SecurityProtocol = SecurityProtocol.SaslSsl,
                 SaslMechanism = SaslMechanism.Plain,
@@ -23,29 +23,34 @@ namespace TStore.Consumers.MessageViewer
 
             using (IConsumer<string, string> consumer = new ConsumerBuilder<string, string>(config).Build())
             {
-                while (!stop)
+                try
                 {
-                    try
+                    while (!stop)
                     {
-                        Console.Clear();
-                        Console.Write("Choose a topic: ");
-                        string topic = Console.ReadLine();
-                        Console.Write("Choose a partition: ");
-                        int partition = int.Parse(Console.ReadLine());
-                        WatermarkOffsets offsets = consumer.QueryWatermarkOffsets(new TopicPartition(topic, partition), TimeSpan.FromSeconds(10));
-                        Console.WriteLine($"Current available offset: {offsets.Low} - {offsets.High}");
-                        Console.Write("Choose an offset to begin consuming: ");
-                        int offset = int.Parse(Console.ReadLine());
-                        ReadAllMessages(consumer, topic, partition, offset);
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.Error.WriteLine(ex);
-                        stop = true;
+                        try
+                        {
+                            Console.Clear();
+                            Console.Write("Choose a topic: ");
+                            string topic = Console.ReadLine();
+                            Console.Write("Choose a partition: ");
+                            int partition = int.Parse(Console.ReadLine());
+                            WatermarkOffsets offsets = consumer.QueryWatermarkOffsets(new TopicPartition(topic, partition), TimeSpan.FromSeconds(10));
+                            Console.WriteLine($"Current available offset: {offsets.Low} - {offsets.High}");
+                            Console.Write("Choose an offset to begin consuming: ");
+                            int offset = int.Parse(Console.ReadLine());
+                            ReadAllMessages(consumer, topic, partition, offset);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.Error.WriteLine(ex);
+                            stop = true;
+                        }
                     }
                 }
-
-                consumer.Close();
+                finally
+                {
+                    consumer.Close();
+                }
             }
         }
 

@@ -16,4 +16,4 @@ FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
 
-CMD sleep 14s; dotnet TStore.Consumers.ExternalProductSync.dll
+CMD sleep 20s; dotnet TStore.Consumers.ExternalProductSync.dll

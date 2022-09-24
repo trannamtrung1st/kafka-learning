@@ -24,6 +24,7 @@ namespace TStore.Consumers.ShipCalculator
         private readonly AppConsumerConfig _baseConfig;
         private readonly MemoryCache _memoryCache;
         private readonly IOptions<MemoryCacheOptions> _memoryCacheOptions;
+        private bool _cancelled;
 
         public Worker(IServiceProvider serviceProvider, IConfiguration configuration,
             IApplicationLog log,
@@ -47,60 +48,72 @@ namespace TStore.Consumers.ShipCalculator
         {
             Thread thread = new Thread(async () =>
             {
-                try
+                while (!_cancelled)
                 {
-                    using (IConsumer<string, OrderModel> consumer
-                        = new ConsumerBuilder<string, OrderModel>(_baseConfig)
-                            .SetValueDeserializer(new SimpleJsonSerdes<OrderModel>())
-                            .Build())
+                    try
                     {
-                        consumer.Subscribe(EventConstants.Events.NewOrder);
-
-                        bool cancelled = false;
-
-                        while (!cancelled)
-                        {
-                            ConsumeResult<string, OrderModel> message = consumer.Consume(default(CancellationToken));
-
-                            // [DEMO] idempotence
-                            if (_memoryCache.TryGetValue(message.Message.Key, out bool exists))
-                            {
-                                await _log.LogAsync($"Key {message.Message.Key} is duplicated, will skip for now");
-                            }
-                            else
-                            {
-                                await _log.LogAsync($"Consumer {idx} begins handle message {message.Message.Timestamp.UtcDateTime}");
-
-                                using (IServiceScope scope = _serviceProvider.CreateScope())
-                                {
-                                    await HandleNewOrderAsync(
-                                        Guid.Parse(message.Message.Key),
-                                        message.Message.Value);
-                                }
-
-                                CacheKey(message.Message.Key);
-                            }
-
-                            try
-                            {
-                                consumer.Commit();
-                            }
-                            catch (Exception ex)
-                            {
-                                await _log.LogAsync(ex.Message);
-                            }
-                        }
-
-                        consumer.Close();
+                        await ConsumeAsync(idx);
                     }
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine(ex);
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine(ex);
+                        await Task.Delay(7000);
+                    }
                 }
             });
             thread.IsBackground = true;
             thread.Start();
+        }
+
+        private async Task ConsumeAsync(int idx)
+        {
+            using (IConsumer<string, OrderModel> consumer
+                = new ConsumerBuilder<string, OrderModel>(_baseConfig)
+                    .SetValueDeserializer(new SimpleJsonSerdes<OrderModel>())
+                    .Build())
+            {
+                try
+                {
+                    consumer.Subscribe(EventConstants.Events.NewOrder);
+
+                    while (!_cancelled)
+                    {
+                        ConsumeResult<string, OrderModel> message = consumer.Consume(default(CancellationToken));
+
+                        // [DEMO] idempotence
+                        if (_memoryCache.TryGetValue(message.Message.Key, out bool exists))
+                        {
+                            await _log.LogAsync($"Key {message.Message.Key} is duplicated, will skip for now");
+                        }
+                        else
+                        {
+                            await _log.LogAsync($"Consumer {idx} begins handle message {message.Message.Timestamp.UtcDateTime}");
+
+                            using (IServiceScope scope = _serviceProvider.CreateScope())
+                            {
+                                await HandleNewOrderAsync(
+                                    Guid.Parse(message.Message.Key),
+                                    message.Message.Value);
+                            }
+
+                            CacheKey(message.Message.Key);
+                        }
+
+                        try
+                        {
+                            consumer.Commit();
+                        }
+                        catch (Exception ex)
+                        {
+                            await _log.LogAsync(ex.Message);
+                        }
+                    }
+                }
+                finally
+                {
+                    consumer.Close();
+                }
+            }
         }
 
         private async Task HandleNewOrderAsync(Guid key, OrderModel orderModel)

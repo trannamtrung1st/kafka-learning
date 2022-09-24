@@ -23,6 +23,7 @@ namespace TStore.Shared.Helpers
             {
                 if (parent.EnumerateDirectories("misc").Any(dir => dir.Name == "misc"))
                 {
+                    config.SslCaLocation = Path.Combine(parent.FullName, "misc", "certs", "kafka-broker", "ca-root.crt");
                     config.SslCertificateLocation = Path.Combine(parent.FullName, "misc", "certs", "kafka-client", "tstore.crt");
                     config.SslKeyLocation = Path.Combine(parent.FullName, "misc", "certs", "kafka-client", "tstore.key");
                     return;
