@@ -18,4 +18,4 @@ FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
 
-CMD sleep 20s; dotnet TStore.InteractionApi.dll
+CMD sleep 30s; dotnet TStore.InteractionApi.dll
