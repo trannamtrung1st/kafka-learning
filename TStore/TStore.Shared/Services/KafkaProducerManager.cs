@@ -118,9 +118,9 @@ namespace TStore.Shared.Services
                 });
             }
 
-            if (!existedBefore)
+            lock (producerPool)
             {
-                lock (producerPool)
+                if (!existedBefore)
                 {
                     producerPool.InitializePool<TKey, TValue>(config, transactionName);
                 }

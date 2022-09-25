@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TStore.Shared.Configs;
@@ -69,7 +71,10 @@ namespace TStore.Consumers.ExternalProductSync
         private async Task ConsumeAsync(int idx)
         {
             IKafkaProducerManager kafkaProducerManager = _serviceProvider.GetService<IKafkaProducerManager>();
-            SemaphoreSlim semaphore = new SemaphoreSlim(1, 1);
+            SemaphoreSlim consumeSemaphore = new SemaphoreSlim(1, 1);
+            SemaphoreSlim commitSemaphore = new SemaphoreSlim(1, 1);
+            Dictionary<TopicPartition, Offset> offsetToCommitMap = new Dictionary<TopicPartition, Offset>();
+            CancellationTokenSource cancellationTokenSrc = new CancellationTokenSource();
 
             // [Important] 1 TransactionalId per producer instance
             TransactionalProducerWrapper<string, string> producerWrapper = null;
@@ -84,6 +89,11 @@ namespace TStore.Consumers.ExternalProductSync
                 using (IConsumer<string, ProductModel> consumer
                     = new ConsumerBuilder<string, ProductModel>(_baseConsumerConfig)
                         .SetValueDeserializer(new SimpleJsonSerdes<ProductModel>())
+                        .SetPartitionsRevokedHandler((consumer, offsets) =>
+                        {
+                            commitSemaphore.Wait();
+                            commitSemaphore.TryRelease();
+                        })
                         .Build())
                 {
                     try
@@ -95,9 +105,13 @@ namespace TStore.Consumers.ExternalProductSync
                         {
                             try
                             {
-                                producerWrapper.AbortTransaction();
-
                                 inTransaction = false;
+                                consumeSemaphore.TryRelease();
+                                commitSemaphore.TryRelease();
+                                offsetToCommitMap.Clear();
+                                cancellationTokenSrc.Cancel();
+
+                                producerWrapper.AbortTransaction();
 
                                 await _log.LogAsync($"Aborted transaction {producerWrapper.TransactionalId}");
                             }
@@ -118,14 +132,16 @@ namespace TStore.Consumers.ExternalProductSync
                             EventConstants.Events.ProductUpdated
                         });
 
-                        while (!_cancelled)
+                        while (!cancellationTokenSrc.IsCancellationRequested)
                         {
-                            ConsumeResult<string, ProductModel> message = consumer.Consume(default(CancellationToken));
+                            ConsumeResult<string, ProductModel> message = consumer.Consume(cancellationTokenSrc.Token);
 
-                            await semaphore.WaitAsync();
+                            await consumeSemaphore.WaitAsync();
 
                             if (!inTransaction)
                             {
+                                await commitSemaphore.WaitAsync();
+
                                 producerWrapper.BeginTransaction();
 
                                 inTransaction = true;
@@ -141,11 +157,24 @@ namespace TStore.Consumers.ExternalProductSync
                                 {
                                     try
                                     {
-                                        await semaphore.WaitAsync();
+                                        await consumeSemaphore.WaitAsync();
 
-                                        producerWrapper.CommitTransaction();
+                                        if (offsetToCommitMap.Count > 0)
+                                        {
+                                            TopicPartitionOffset[] offsets = offsetToCommitMap.Select(o => new TopicPartitionOffset(o.Key, o.Value)).ToArray();
+
+                                            producerWrapper.SendOffsetsToTransaction(
+                                                offsets, consumer.ConsumerGroupMetadata,
+                                                TimeSpan.FromSeconds(30));
+
+                                            producerWrapper.CommitTransaction();
+
+                                            offsetToCommitMap.Clear();
+                                        }
 
                                         inTransaction = false;
+                                        consumeSemaphore.TryRelease();
+                                        commitSemaphore.TryRelease();
 
                                         await _log.LogAsync($"Committed transaction {producerWrapper.TransactionalId}");
                                     }
@@ -153,10 +182,6 @@ namespace TStore.Consumers.ExternalProductSync
                                     {
                                         Console.Error.WriteLine(ex);
                                         await abortTransFunc();
-                                    }
-                                    finally
-                                    {
-                                        semaphore.Release();
                                     }
                                 };
                                 commitTimer.Start();
@@ -171,7 +196,7 @@ namespace TStore.Consumers.ExternalProductSync
 
                             try
                             {
-                                await _log.LogAsync($"Consumer {idx} begins to transform product {JsonConvert.SerializeObject(message.Message.Value)}");
+                                await _log.LogAsync($"[{message.Topic}] Consumer {idx} begins to transform product {JsonConvert.SerializeObject(message.Message.Value)}");
 
                                 for (int i = 0; i < 10; i++)
                                 {
@@ -183,26 +208,24 @@ namespace TStore.Consumers.ExternalProductSync
                                         });
                                 }
 
-                                producerWrapper.SendOffsetsToTransaction(
-                                    new[] { message.TopicPartitionOffset },
-                                    consumer.ConsumerGroupMetadata,
-                                    TimeSpan.FromSeconds(30));
+                                offsetToCommitMap[message.TopicPartition] = message.Offset + 1;
 
-                                await _log.LogAsync($"Consumer {idx} finishes processing product {message.Message.Value.Id}");
+                                consumeSemaphore.TryRelease();
+
+                                await _log.LogAsync($"[{message.Topic}] Consumer {idx} finishes processing product {message.Message.Value.Id}");
                             }
                             catch (Exception ex)
                             {
                                 await abortTransFunc();
                                 throw ex;
                             }
-                            finally
-                            {
-                                semaphore.Release();
-                            }
                         }
                     }
                     finally
                     {
+                        consumeSemaphore.TryRelease();
+                        commitSemaphore.TryRelease();
+
                         consumer.Close();
                     }
                 }
