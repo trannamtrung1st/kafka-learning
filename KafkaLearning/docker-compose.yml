@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  kafka:
+    image: kafka-learning:simple-kafka-linux-1.0
+    build:
+      context: .
+      dockerfile: misc/kafka/Dockerfile
+    volumes:
+      - ./misc/kafka/config:/kafka/config-override
+      - ./misc/kafka/scripts:/kafka/scripts
+    ports:
+      - target: 9092
+        published: 9092
+        
+networks:
+  default:
+    name: kafka-learning-shared-network
