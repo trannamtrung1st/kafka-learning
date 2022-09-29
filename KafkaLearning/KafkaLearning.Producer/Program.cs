@@ -92,6 +92,8 @@ namespace KafkaLearning.Producer
         {
             Console.Write("Enter topic: ");
             string topic = Console.ReadLine();
+            Console.Write("Enter delay: ");
+            int delay = int.Parse(Console.ReadLine());
             bool stop = false;
             Task task = Task.Run(async () =>
             {
@@ -108,7 +110,7 @@ namespace KafkaLearning.Producer
 
                     Console.WriteLine($"Produced message key {key} - value {value}");
 
-                    await Task.Delay(250);
+                    await Task.Delay(delay);
                 }
             });
 
