@@ -23,7 +23,7 @@ namespace KafkaLearning
             while (choice?.Trim() != "4")
             {
                 Console.Clear();
-                Console.WriteLine("==== WELCOME TO KAFKA ====");
+                Console.WriteLine("==== Welcome to Kafka Admin ====");
                 Console.WriteLine("1. Create a topic");
                 Console.WriteLine("2. Delete a topic");
                 Console.WriteLine("3. Print broker metadata");
@@ -48,7 +48,7 @@ namespace KafkaLearning
                 }
 
                 Console.WriteLine("======================");
-                Console.WriteLine("Press any to continue");
+                Console.WriteLine("Press enter to continue");
                 Console.ReadLine();
             }
         }
@@ -57,11 +57,15 @@ namespace KafkaLearning
         {
             Console.Write("Enter topic name: ");
             string topicName = Console.ReadLine();
+            Console.Write("Enter number of partitions: ");
+            int numPartitions = int.Parse(Console.ReadLine());
+
             await adminClient.CreateTopicsAsync(new[]
             {
                 new TopicSpecification
                 {
-                    Name = topicName
+                    Name = topicName,
+                    NumPartitions = numPartitions
                 }
             });
         }
