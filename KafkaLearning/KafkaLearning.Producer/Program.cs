@@ -107,6 +107,8 @@ namespace KafkaLearning.Producer
                     });
 
                     Console.WriteLine($"Produced message key {key} - value {value}");
+
+                    await Task.Delay(250);
                 }
             });
 
