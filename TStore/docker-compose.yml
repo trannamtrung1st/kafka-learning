@@ -348,6 +348,7 @@ services:
     environment:
       - KAFKA_OPTS=${KAFKA_OPTS:--Djava.security.auth.login.config=/kafka/config-override/kafka_server_jaas.conf -Dzookeeper.sasl.client=false -Dzookeeper.ssl.hostnameVerification=false} # Setup SASL using Jaas static file
       - BROKER_ID=1
+      - BROKER_RACK=Vietnam
       - LOCAL_PORT=9093
       - DOCKER_PORT=29093
       - CREATE_ACLS=true
@@ -372,6 +373,7 @@ services:
     environment:
       - KAFKA_OPTS=${KAFKA_OPTS:--Djava.security.auth.login.config=/kafka/config-override/kafka_server_jaas.conf -Dzookeeper.sasl.client=false -Dzookeeper.ssl.hostnameVerification=false} # Setup SASL using Jaas static file
       - BROKER_ID=2
+      - BROKER_RACK=US
       - LOCAL_PORT=9095
       - DOCKER_PORT=29095
     volumes:
@@ -395,6 +397,7 @@ services:
     environment:
       - KAFKA_OPTS=${KAFKA_OPTS:--Djava.security.auth.login.config=/kafka/config-override/kafka_server_jaas.conf -Dzookeeper.sasl.client=false -Dzookeeper.ssl.hostnameVerification=false} # Setup SASL using Jaas static file
       - BROKER_ID=3
+      - BROKER_RACK=UK
       - LOCAL_PORT=9097
       - DOCKER_PORT=29097
     volumes:

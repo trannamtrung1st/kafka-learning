@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/mssql/server:2019-latest AS base
+FROM mcr.microsoft.com/mssql/server:2019-CU18-ubuntu-20.04 AS base
 EXPOSE 1433
 
 FROM mcr.microsoft.com/dotnet/sdk:3.1.422-bullseye AS build
