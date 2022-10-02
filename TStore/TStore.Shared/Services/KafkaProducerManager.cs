@@ -50,9 +50,7 @@ namespace TStore.Shared.Services
             string eventName,
             AppProducerConfig config)
         {
-            IProducer<TKey, TValue> producer;
-
-            if (!_commonProducerMap.TryGetValue(eventName, out IClient producerObj))
+            IProducer<TKey, TValue> producer = _commonProducerMap.GetOrAdd(eventName, key =>
             {
                 ProducerConfig clonedConfig = config.Clone();
 
@@ -66,11 +64,9 @@ namespace TStore.Shared.Services
                 }
 
                 producer = builder.Build();
-            }
-            else
-            {
-                producer = producerObj as IProducer<TKey, TValue>;
-            }
+
+                return producer;
+            }) as IProducer<TKey, TValue>;
 
             return producer;
         }
