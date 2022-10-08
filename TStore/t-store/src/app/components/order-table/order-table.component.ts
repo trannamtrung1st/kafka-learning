@@ -74,7 +74,7 @@ export class OrderTableComponent implements OnInit, OnDestroy {
     this._appStateService.newOrder$
       .pipe(takeUntil(this._destroy$))
       .subscribe(newOrder => {
-        if (this.orders) {
+        if (this.orders && this.orders.findIndex(o => o.id === newOrder.id) < 0) {
           this.orders = [newOrder, ...this.orders];
           this.total += 1;
         }
