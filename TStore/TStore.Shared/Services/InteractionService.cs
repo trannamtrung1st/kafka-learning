@@ -205,6 +205,8 @@ FROM sys.columns A"
 
         public async Task BigDataLoad(string dest, IEnumerable<InteractionModel> newInteractionModels)
         {
+            await Task.Delay(new Random().Next(1000, 2000));
+
             string[] tsvData = newInteractionModels.Select(i => new[]
             {
                 i.Id.ToString(),
