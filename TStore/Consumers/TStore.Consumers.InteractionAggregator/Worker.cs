@@ -62,8 +62,11 @@ namespace TStore.Consumers.InteractionAggregator
 
         private async Task ConsumeAsync(int idx)
         {
+            AppConsumerConfig configClone = _baseConfig.Clone();
+            configClone.GroupInstanceId = $"{idx}";
+
             using (IConsumer<string, IEnumerable<InteractionModel>> consumer
-                    = new ConsumerBuilder<string, IEnumerable<InteractionModel>>(_baseConfig)
+                    = new ConsumerBuilder<string, IEnumerable<InteractionModel>>(configClone)
                         .SetValueDeserializer(new SimpleJsonSerdes<IEnumerable<InteractionModel>>())
                         .Build())
             {
