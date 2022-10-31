@@ -82,7 +82,7 @@ namespace TStore.Consumers.InteractionAggregator
 
                         using (IServiceScope scope = _serviceProvider.CreateScope())
                         {
-                            await HandleNewInteractionsAsync(message.Message.Value);
+                            await HandleNewInteractionsAsync(message.Message.Value, scope.ServiceProvider);
                         }
 
                         try
@@ -102,9 +102,10 @@ namespace TStore.Consumers.InteractionAggregator
             }
         }
 
-        private async Task HandleNewInteractionsAsync(IEnumerable<InteractionModel> interactionModels)
+        private async Task HandleNewInteractionsAsync(IEnumerable<InteractionModel> interactionModels,
+            IServiceProvider serviceProvider)
         {
-            IInteractionService interactionService = _serviceProvider.GetRequiredService<IInteractionService>();
+            IInteractionService interactionService = serviceProvider.GetRequiredService<IInteractionService>();
 
             await interactionService.AggregateInteractionReportAsync(interactionModels);
 

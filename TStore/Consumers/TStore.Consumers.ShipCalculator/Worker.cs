@@ -93,7 +93,8 @@ namespace TStore.Consumers.ShipCalculator
                             {
                                 await HandleNewOrderAsync(
                                     Guid.Parse(message.Message.Key),
-                                    message.Message.Value);
+                                    message.Message.Value,
+                                    scope.ServiceProvider);
                             }
 
                             CacheKey(message.Message.Key);
@@ -116,9 +117,9 @@ namespace TStore.Consumers.ShipCalculator
             }
         }
 
-        private async Task HandleNewOrderAsync(Guid key, OrderModel orderModel)
+        private async Task HandleNewOrderAsync(Guid key, OrderModel orderModel, IServiceProvider serviceProvider)
         {
-            IOrderService orderService = _serviceProvider.GetService<IOrderService>();
+            IOrderService orderService = serviceProvider.GetService<IOrderService>();
 
             double shipAmount = await orderService.ApplyShipAsync(key, orderModel);
 
